@@ -1034,7 +1034,7 @@ if __name__ == "__main__":  # ------------run it ----
     # run loop
     hsv_dict=hsv.run()
     if hsv_dict is not None:
-      fnam= 'object'+str(args['cscreateButalibrate'])+'_hsv.yml'
+      fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
       with open(fnam, 'w') as of: 
         yaml.dump(hsv_dict, of, default_flow_style=True)
       print("hsv range saved to file ",fnam) 
@@ -1056,8 +1056,8 @@ if __name__ == "__main__":  # ------------run it ----
                        video_height = 800,
                        fps = 24)
   # -- loop 
-    key = ord('c')
-    while key == ord('c'):
+    key = ord('c') 
+    while key == ord('c') or key==ord(' '):
       ppB.init()
     # run video analysis from camera
       result = ppB.run()
