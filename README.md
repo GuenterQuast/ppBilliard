@@ -34,7 +34,7 @@ great work!
 
 Created by Guenter Quast, initial Version Aug. 2022 
 
-###Installation:
+### Installation:
 
 On a standard Python (>3.6) environment the OpenCV library 
 is installed via the command  
@@ -114,7 +114,7 @@ speed and centrality of the collision. As a result, a true competition
 of teams for the largest harvest of of interesting events could arise.
 
 The present selection of collision events from the CMS experiment 
-can be replaced by collections of images other sources.
+can be replaced by collections of images from other sources.
 
 **Please contribute!**
 
