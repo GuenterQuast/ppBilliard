@@ -19,6 +19,70 @@ import cv2 as cv    # openCV package
 
 # --- helper functions
 
+class videoSource(object):
+  """Set up video stream"""
+  
+  def __init__(self, vdev_id=0,
+               v_width=None, v_height=None, fps=24,
+               videoFile=None):
+    """set parameters of video device"""
+    # store iinput options
+    self.vdev_id = vdev_id
+    self.cam_width = v_width
+    self.cam_height = v_height
+    self.cam_fps = fps
+    self.videoFile = videoFile
+    self.useCam = True if videoFile is None else False
+  
+    self.vStream = None # no open video stream yet
+  
+  def init(self):
+    """(re-)initialize video input
+
+      VideoCapture.set() command codes
+      0. CV_CAP_PROP_POS_MSEC Current position of the video file in milliseconds.
+      1. CV_CAP_PROP_POS_FRAMES 0-based index of the frame to be decoded/captured next.
+      2. CV_CAP_PROP_POS_AVI_RATIO Relative position of the video file
+      3. CV_CAP_PROP_FRAME_WIDTH Width of the frames in the video stream.
+      4. CV_CAP_PROP_FRAME_HEIGHT Height of the frames in the video stream.
+      5. CV_CAP_PROP_FPS Frame rate.
+      6. CV_CAP_PROP_FOURCC 4-character code of codec.
+      7. CV_CAP_PROP_FRAME_COUNT Number of frames in the video file.
+      8. CV_CAP_PROP_FORMAT Format of the Mat objects returned by retrieve() .
+      9. CV_CAP_PROP_MODE Backend-specific value indicating the current capture mode.
+      10. CV_CAP_PROP_BRIGHTNESS Brightness of the image (only for cameras).
+      11. CV_CAP_PROP_CONTRAST Contrast of the image (only for cameras).
+      12. CV_CAP_PROP_SATURATION Saturation of the image (only for cameras).
+      13. CV_CAP_PROP_HUE Hue of the image (only for cameras).
+      14. CV_CAP_PROP_GAIN Gain of the image (only for cameras).
+      15. CV_CAP_PROP_EXPOSURE Exposure (only for cameras).
+      16. CV_CAP_PROP_CONVERT_RGB Boolean flags indicating whether images should be converted to RGB.
+      17. CV_CAP_PROP_WHITE_BALANCE Currently unsupported
+      18. CV_CAP_PROP_RECTIFICATION Rectification flag for stereo cameras 
+          (note: only supported by DC1394 v 2.x backend currently)
+  """
+    
+    if self.vStream is None or (
+       self.vStream is not None and not self.vStream.isOpened()):
+      if self.useCam:
+        self.vStream = cv.VideoCapture(self.vdev_id)
+        if self.cam_width is not None:
+          self.vStream.set(3, self.cam_width)
+          # print("setting cam width: ", self.cam_width)
+        if self.cam_height is not None:
+          self.vStream.set(4, self.cam_height)
+          # print("setting cam height: ", self.cam_height)
+        if self.cam_fps is not None:
+          # print("setting cam fps: ", self.cam_fps)
+          self.vStream.set(5, self.cam_fps)  
+      else:
+        # otherwise, grab a reference to the video file
+        self.vStream = cv.VideoCapture(self.videoFile)
+    return self.vStream 
+
+  def stop(self):
+    self.vStream.release()
+  
 class hsvRangeFinder(object):
   """Support Class for video tracking of colored objects
 
@@ -31,38 +95,12 @@ class hsvRangeFinder(object):
   def do_nothing(x):
     pass
   
-  def __init__(self, vdev_id=0, video_width=None, video_height=None, fps=None):
-    # initialize webcam 
-    self.vcap = cv.VideoCapture(videodev_id) # 0, 2, 4 ...
-    # set webcam options
-    if video_width is not None:
-      self.vcap.set(3, video_width)  # width
-    if video_height is not None:
-      self.vcap.set(4, video_height)  # height
-    if fps is not None:
-      self.vcap.set(5, fps)    # frame rate    
-
-    """ VideoCapture.set() command codes
-    0. CV_CAP_PROP_POS_MSEC Current position of the video file in milliseconds.
-    1. CV_CAP_PROP_POS_FRAMES 0-based index of the frame to be decoded/captured next.
-    2. CV_CAP_PROP_POS_AVI_RATIO Relative position of the video file
-    3. CV_CAP_PROP_FRAME_WIDTH Width of the frames in the video stream.
-    4. CV_CAP_PROP_FRAME_HEIGHT Height of the frames in the video stream.
-    5. CV_CAP_PROP_FPS Frame rate.
-    6. CV_CAP_PROP_FOURCC 4-character code of codec.
-    7. CV_CAP_PROP_FRAME_COUNT Number of frames in the video file.
-    8. CV_CAP_PROP_FORMAT Format of the Mat objects returned by retrieve() .
-    9. CV_CAP_PROP_MODE Backend-specific value indicating the current capture mode.
-    10. CV_CAP_PROP_BRIGHTNESS Brightness of the image (only for cameras).
-    11. CV_CAP_PROP_CONTRAST Contrast of the image (only for cameras).
-    12. CV_CAP_PROP_SATURATION Saturation of the image (only for cameras).
-    13. CV_CAP_PROP_HUE Hue of the image (only for cameras).
-    14. CV_CAP_PROP_GAIN Gain of the image (only for cameras).
-    15. CV_CAP_PROP_EXPOSURE Exposure (only for cameras).
-    16. CV_CAP_PROP_CONVERT_RGB Boolean flags indicating whether images should be converted to RGB.
-    17. CV_CAP_PROP_WHITE_BALANCE Currently unsupported
-    18. CV_CAP_PROP_RECTIFICATION Rectification flag for stereo cameras (note: only supported by DC1394 v 2.x backend currently)
-"""
+  def __init__(self, vdev_id=0,
+               v_width=None, v_height=None, fps=None,
+               videoFile=None):
+    
+    self.vSource=videoSource(vdev_id, v_width, v_height, fps, videoFile)
+    self.vs = self.vSource.init()
 
     # create a window named trackbars.
     cv.namedWindow("Trackbars")
@@ -78,18 +116,26 @@ class hsvRangeFinder(object):
   def run(self):
 
     hsv_dict = None  #output dictionary
+    state_paused = False
 
+    print("\n  -->  Color calibration of trackable objects  <--")    
+    print(5*" ", " type commands in video window:") 
+    print(5*" ", "     's' to save, ")
+    print(5*" ", "     'p' to pause/resume input stream,")
+    print(5*" ", "     'q' or <esc> to exit\n")
+    
     while True:
       # Start reading the webcam feed frame by frame.
-      ret, frame = self.vcap.read()
-      if not ret:
-        break
+      if not state_paused:
+        ret, frame = self.vs.read()
+        if not ret:
+          break
 
-      # Flip the frame horizontally (Not required)
-      #frame = cv.flip( frame, 1 ) # 0:x 1:y -1:x & y
+        # Flip the frame horizontally (Not required)
+        #frame = cv.flip( frame, 1 ) # 0:x 1:y -1:x & y
     
-      # Convert the BGR image to HSV image.
-      hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+        # Convert the BGR image to HSV image.
+        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
     
       # Get trackbar value in real timem
       l_h = cv.getTrackbarPos("L - H", "Trackbars")
@@ -118,18 +164,22 @@ class hsvRangeFinder(object):
     
       # <esc> or 'q'  exit the program
       key = cv.waitKey(1)
-      if (key == 27) or (key == ord('q')): return hsv_dict
-    
-      # save and return if user presses `s`
-      if key == ord('s'):
-        hsv_dict = {}
+      if (key == ord('p')):
+        # toggle paused state
+        state_paused = not state_paused
+      elif (key == ord(' ') or key == ord('r')):
+        state_paused = False
+      elif(key == 27) or (key == ord('q')):
+        return hsv_dict
+      elif key == ord('s'):
+        # save and return if user presses `s`
         hsv_dict = {'hsv_l' : [l_h, l_s, l_v],
                     'hsv_h' : [u_h, u_s, u_v] }
         return hsv_dict
 
   def stop(self):
     # Finally, release camera & destroy windows.    
-    self.vcap.release()
+    self.vSource.stop()
     cv.destroyAllWindows()
 
   # --- end class hsvRangeFinder
@@ -237,7 +287,9 @@ def smoothImage(frame):
   blurred = cv.GaussianBlur(frame, (11, 11), 0)
   return cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
 
-def findObject_byColor(hsv_image, colLower, colUpper, algo = "Contours"):  
+def findcircularObject_byColor(hsv_image,
+                               colLower, colUpper,
+                               rmin, rmax, algo = "Contours"):  
   # construct a mask for the color range given by colLower - colUpper,
   #  then perform a series of dilations and erosions to remove
   #  any small blobs left in the mask
@@ -251,7 +303,7 @@ def findObject_byColor(hsv_image, colLower, colUpper, algo = "Contours"):
     cv.imshow("canny", edges)
     circles = cv.HoughCircles(edges, cv.HOUGH_GRADIENT,
                               dp=4, minDist=200, param1=50, param2=200,
-       minRadius=30, maxRadius=200)
+                              minRadius=rmin, maxRadius=rmax)
     xy, r = None, 0
     if circles is not None:
       circles = np.round(circles[0, :]).astype("int")
@@ -260,20 +312,24 @@ def findObject_byColor(hsv_image, colLower, colUpper, algo = "Contours"):
           r = c[2]
           xy =(c[0],c[1])
     return xy, r
-  
-  # find contours in the mask and (x, y) of center
+
+  # standard Algorithm:
+  #   find contours in the mask and (x, y) of center
   cnts, _obj2 = cv.findContours(mask.copy(), cv.RETR_EXTERNAL,
          cv.CHAIN_APPROX_SIMPLE)
   xy , r = None,  0
   # only proceed if at least one contour was found
   if len(cnts) > 0:
-    # find the largest contour in the mask, then use it to
-    # compute the minimum enclosing circle and centroid
-    c = max(cnts, key=cv.contourArea)
-    ( (x, y), r) = cv.minEnclosingCircle(c)
-    xy, r = (int(x), int(y)), int(r)
-    #M = cv.moments(c)
-    #center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+    # find largest contour in the mask
+      ##c = max(cnts, key=cv.contourArea)
+    for c in cnts:
+      #  compute minimum enclosing circle and centroid
+      ( (_x, _y), _r) = cv.minEnclosingCircle(c)
+      if (rmax >= _r >= rmin) and _r > r:
+        r = int(_r)
+        xy = (int(_x), int(_y))
+      #M = cv.moments(c)
+      #center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
   return xy, r
 
 def plotTrace(frame, points, lw=3, color=(100,100,100)):
@@ -283,6 +339,7 @@ def plotTrace(frame, points, lw=3, color=(100,100,100)):
     if points[i - 1] is None or points[i] is None:
       continue
     # otherwise, draw the connecting lines
+    cv.circle(frame, points[i], 3, color, -1)
     cv.line(frame, points[i - 1], points[i], color, lw)
 
 def blur_region(frame, xy, wxy, ksize=7):
@@ -553,22 +610,25 @@ class frameRate():
       self.nframes = 0
     return(self.rate)
 
+
 #---  end helpers --------------------------------------------
 
 class ppBilliard(object):
   """Track colored objects in a video and replace by symbolic Proton
   """
 
-  def __init__(self, vdev_id=0, video_width=None, video_height=None, fps=24):
+  def __init__(self, vdev_id=0,
+               v_width=None, v_height=None, fps=24,
+               videoFile=None):
 
     self.first = True # first round
     self.playIntro = True # show intro if true
-    
-    # set webcam options
-    self.vdev_id = vdev_id
-    self.cam_width = video_width
-    self.cam_height = video_height
-    self.cam_fps = fps
+    self.useCam = True if videoFile is None else False
+
+    # set-up class managing video source
+    self.vSource=videoSource(vdev_id, v_width, v_height, fps, videoFile)
+    self.videoFile = self.vSource.videoFile
+    self.vs = self.vSource.vStream
       
     # properties of trackable objects
     hsv_from_file = True # get colors from yaml-file if true
@@ -616,11 +676,10 @@ class ppBilliard(object):
     col3Lower = (col_green - 10, 60, 60)
     col3Upper = (col_green + 10, 200, 200)
     self.obj_col3 = [col3Lower, col3Upper]
-
     #col_blue = 100  # blue
 
-    self.obj_min_radius = 5
-
+    self.obj_min_radius = 25
+    self.obj_max_radius = 100
     #
     # --- define video parameters
     #
@@ -629,10 +688,6 @@ class ppBilliard(object):
 
     self.pts1 = deque(maxlen=args["buffer"]) # queue for object1 xy
     self.pts2 = deque(maxlen=args["buffer"]) # queue for object2 xy
-
-    # no video source yet
-    self.vs = None
-    self.useCam = True if not args.get("video", False) else False
     
     #
     # --- output greeter
@@ -641,7 +696,7 @@ class ppBilliard(object):
     if self.useCam:
       print("  reading video device ", videodev_id)
     else:  
-      print("  reading from file ", args["video"])
+      print("  reading from file ", self.videoFile)
     print("      type 'q' or <esc> to exit in video window\n")
 
     # allow the camera or video file to warm up
@@ -664,27 +719,10 @@ class ppBilliard(object):
       self.bkgimg = cv.imread('images/RhoZ_empty.png', cv.IMREAD_COLOR)
     except:
       self.bkgimg = None
-    #
-    # (re-)initialize video input
-    if self.vs is None or (
-       self.vs is not None and not self.vs.isOpened()):
-      if not args.get("video", False):
-        # if no video path supplied, grab reference to webcam
-        self.useCam = True
-        self.vs = cv.VideoCapture(self.vdev_id)
-        if self.cam_width is not None:
-          self.vs.set(3, self.cam_width)
-          # print("setting cam width: ", self.cam_width)
-        if self.cam_height is not None:
-          self.vs.set(4, self.cam_height)
-          # print("setting cam height: ", self.cam_height)
-        if self.cam_fps is not None:
-          # print("setting cam fps: ", self.cam_fps)
-          self.vs.set(5, self.cam_fps)      
-      else:
-        # otherwise, grab a reference to the video file
-        self.useCam = False
-        self.vs = cv.VideoCapture(args["video"])
+
+    # init video device and return video stream  
+    self.vs = self.vSource.init()
+
     #    
     # create video window for program output (webcam + tracked objects)
     self.WNam = "VWin"
@@ -875,19 +913,21 @@ class ppBilliard(object):
       hsvImg = smoothImage(frame)
 
       # find objects in video frame
-      xy1, r1 = findObject_byColor(hsvImg,
-                                self.obj_col1[0], self.obj_col1[1])
-      # only proceed if the radius meets a minimum size
-      if r1 >= self.obj_min_radius:
+      xy1, r1 = findcircularObject_byColor(hsvImg,
+                                self.obj_col1[0], self.obj_col1[1],
+                                self.obj_min_radius, self.obj_max_radius)
+      # only proceed if the radius fits
+      if self.obj_max_radius >= r1 >= self.obj_min_radius:
         # draw "proton with three quarks and gluons
         proton.draw(frame, xy1[0], xy1[1], r1)      
         #cv.circle(frame, (int(xy1 [0]), int(xy1[1])), int(2),
         #       (0, 255, 255), 2)
 
-      xy2, r2 = findObject_byColor(hsvImg,
-                                self.obj_col2[0], self.obj_col2[1])
-      # rprotonflionly proceed if the radius meets a minimum size
-      if r2 > self.obj_min_radius:
+      xy2, r2 = findcircularObject_byColor(hsvImg,
+                                self.obj_col2[0], self.obj_col2[1],
+                                self.obj_min_radius, self.obj_max_radius)
+      # only proceed if the radius fits
+      if self.obj_max_radius >= r2 >= self.obj_min_radius:
         # draw "proton with three quarks and gluons
         proton.draw(frame, xy2[0], xy2[1], r2)      
         #cv.circle(frame, (int(xy2[0]), int(xy2[1])), int(radius2),
@@ -901,6 +941,10 @@ class ppBilliard(object):
       if self.bkgimg is not None:
         frame = cv.addWeighted(frame, 0.75, self.bkgimg, 0.25, 0.)
 
+      # plot object traces from list of tracked points    
+      plotTrace(frame, self.pts1, lw=2, color=(0, 0, 100) )
+      plotTrace(frame, self.pts2, lw=2, color=(0, 100, 100))
+  
       # check for collisions of objects
       sawCollision = False
       l = len(self.pts1)
@@ -925,9 +969,6 @@ class ppBilliard(object):
           self.resultFrame=frame.copy()
           break
 
-      # plot object traces from list of tracked points    
-      plotTrace(frame, self.pts1, lw=2, color=(0, 0, 100) )
-      plotTrace(frame, self.pts2, lw=2, color=(0, 100, 100))
 
       # put text on first frames
       if self.nframes < 20:
@@ -1004,7 +1045,7 @@ class ppBilliard(object):
   # --- clean-up at the end
   #
   # release video stream and close all windows
-    self.vs.release()
+    self.vSource.stop()
     cv.destroyAllWindows()
 
 
@@ -1026,11 +1067,16 @@ if __name__ == "__main__":  # ------------run it ----
   ap.add_argument("-c", "--calibrate", type=int, default=0,
 	help="find hsv range of trackable object <1/2>")
   args = vars(ap.parse_args())
-
+  # print(args)
+  
   videodev_id = args["source"] # video device number of webcam
   if args['calibrate']:
     # set up camera and interactive window
-    hsv = hsvRangeFinder(videodev_id)
+    hsv = hsvRangeFinder( videodev_id,
+                          v_width = 1024,
+                          v_height = 800,
+                          fps = 24,
+                          videoFile = args["video"])
     # run loop
     hsv_dict=hsv.run()
     if hsv_dict is not None:
@@ -1051,10 +1097,11 @@ if __name__ == "__main__":  # ------------run it ----
     superScore = ('2mu2e/', '4mu/')
     
    # initialize video analysis
-    ppB = ppBilliard(videodev_id,
-                       video_width = 1024,
-                       video_height = 800,
-                       fps = 24)
+    ppB = ppBilliard( videodev_id,
+                      v_width = 1024,
+                      v_height = 800,
+                      fps = 24,
+                      videoFile = args["video"])
   # -- loop 
     key = ord('c') 
     while key == ord('c') or key==ord(' '):
