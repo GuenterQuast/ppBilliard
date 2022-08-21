@@ -782,19 +782,47 @@ class ppBilliard(object):
     # cross-fade to camera image 
     frame = crossfade(self.WNam, frame, tmpimg)
 
+  @staticmethod
+  def extrapolateDistance(v_dist, v_deltav):  
+    """ caluclate extrapolated distance at collision 
+        assuming movement on straight trajectory
+   
+      d_{extr}^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
 
-  def analyzeCollision(self, v_c1, v_c2, v_c1_0, v_c2_0):
+      Input: 
+
+        - 2d-vector distance of objects
+        - 2d-vector velocity difference 
+
+      Returns: 
+          - extrapolated collision distance
+            (assuming movement on staight line with constant velocity)
+    """
+    # coordinates
+    dist_sq = np.inner(v_dist, v_dist)
+    deltav_sq = max(np.inner(v_deltav, v_deltav), 1)
+
+   # caluclate extrapolated distance assuming movement on straight trajectory
+   #    d_{extr}^2 = v_{dist}^2 - (v_{dist} * v_deltav)^2 / v_deltav^2
+    dextr_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
+    return np.sqrt(dextr_sq)  
+
+
+  def analyzeCollision(self, v_c1, v_c2, v_v1, v_v2, dmax):
     """ analyze kinematics of collision of two objects
 
       Input: 
 
-        - 2d-vectors of object coordinates (int) for actual and 
-        - previous positions (2 frames time distance)
+        - 2d-vectors of object coordinates (int) 
+        - 2d-vectors of velocities
+        - maximum distance between colliding objects, i.e. sum of radii
 
       Returns: 
         - result dictionary:
 
           - Coordinates of impact
+          - extrapolated collision distance
+            (assuming movement on staight line with constant velocity)
           - length and angle of distance vector at impact
           - Escore: collision energy [~cm²/s²] for object with mass 1
           - Iscore:    impact parameter[0, 1] 
@@ -804,37 +832,43 @@ class ppBilliard(object):
    #   coordinates in pixels, time in 1/framerate
    # collision point 
     v_C = np.int32(0.5*(v_c1 + v_c2))
-   # distance of obcect centers when colliding
+   # distance of object centers when near colliding
     v_dist = v_c2 - v_c1
-    dist = np.sqrt(np.inner(v_dist, v_dist))
+    dist_sq = np.inner(v_dist, v_dist)
+    dist = np.sqrt(dist_sq)
     angle = int(np.arctan2(v_dist[1], v_dist[0]) * 180/np.pi) 
    # velocities in pixels/time_beweeen_frames
-    nf = 2
-    v_v1 = (v_c1 - v_c1_0)/nf
     v1 = max(1, np.sqrt(np.inner(v_v1, v_v1)))
-    v_v2 = (v_c2 - v_c2_0)/nf
     v2 = max(1, np.sqrt(np.inner(v_v2, v_v2)))
-   # centre-of-mass   
+    v_deltav = v_v2 - v_v1
+
+    # extrapolate distance at collision
+    dist_extr = self.extrapolateDistance(v_dist, v_deltav)
+     
+   # momentum in centre-of-mass system
     v_cms = v_v1 + v_v2
     v_vcms1 = v_v1 - v_cms
     vcms1sq = np.inner(v_vcms1, v_vcms1)             
     v_vcms2 = v_v2 - v_cms
-    vcms2sq = np.inner(v_vcms2, v_vcms2)             
+    vcms2sq = np.inner(v_vcms2, v_vcms2)
+    
    # collision energy in centre-of-mass system
     pixels_per_cm = 10
     # correct for frame rate, assume image resolution 10 pixels/cm 
     Escore = 0.5*(vcms1sq + vcms2sq)/pixels_per_cm**2 * self.framerate**2
    # impact parameter             
-    Iscore = 0.5 * (abs(np.inner(v_dist/dist, v_v1/v1) ) + 
-                    abs(np.inner(v_dist/dist, v_v2/v2) ) )
+    #Iscore = 0.5 * (abs(np.inner(v_dist/dist, v_v1/v1) ) + 
+    #                abs(np.inner(v_dist/dist, v_v2/v2) ) )
+    Iscore = 1. - dist_extr/dmax
    # asymmetry
     Asym = np.sqrt(np.inner(v_cms,v_cms)) / (v1+v2)
     Asym = Asym if v1>v2 else -Asym
-    # construct total score
+    # construct total score (centre-of-mass energy * impact)
     Score = int(Escore * Iscore)
     self.CollisionResult={
         'Coordinates' : (v_C[0], v_C[1]),
         'distance'    : dist,
+        'iDistance'   : dist_extr, 
         'angle'       : angle, 
         'Escore'      : Escore,
         'Iscore'      : Iscore,
@@ -848,13 +882,14 @@ class ppBilliard(object):
       print(" !!! No object 'CollisionResult' found ")
       return
     
-    print("\n  -->>> Collision detected <<<--")
+    print("\n\n *  -->>> Collision detected <<<--*")
     d = self.CollisionResult
-    print("           distance: {:.2g} ".format(d['distance']))      
-    print("    scores: energy: {:.4g}  ".format(d['Escore']) +
+    print(" *           distance: {:.3g} ".format(d['distance']),
+               "  impact distance: {:.3g}".format(d['iDistance']) )      
+    print(" *    scores: energy: {:.4g}  ".format(d['Escore']) +
           "impact: {:.2g}  ".format(d['Iscore']) +
           "asymmetry: {:.2f}".format(d['Asymmetry']) )
-    print(10*" ", "    -->>>    ** ", d['Score'], " **     <<<--")
+    print(" *", 10*" ", "    -->>>    ** ", d['Score'], " **     <<<--")
     
   def run(self):  
     """Read Camera, track objects and detect Collision
@@ -953,22 +988,29 @@ class ppBilliard(object):
         and self.pts1[2] is not None and self.pts2[2] is not None :
         v_c1 = np.array(xy1)
         v_c2 = np.array(xy2)
-        v_dist = v_c2 - v_c1
+        v_dist = v_c2 - v_c1        
         dist = np.sqrt(np.inner(v_dist, v_dist))
-        if dist < 1.01*(r1+r2):  # objects (nearly) touched
-          sawCollision=True
-          v_c10 = np.array(self.pts1[2])
-          v_c20 = np.array(self.pts2[2])
-          # analyze kinematics
-          self.analyzeCollision(v_c1, v_c2, v_c10, v_c20)
-          # draw Collision
-          dist = int(self.CollisionResult['distance'])
-          angle = int( self.CollisionResult['angle'])
-          v_C = self.CollisionResult['Coordinates']
-          proton.drawCollision(frame, v_C, dist, angle)
-          self.resultFrame=frame.copy()
-          break
-
+        if dist < 1.5*(r1+r2):  # objects (nearly) touched
+          nf = 2
+          v_c10 = np.array(self.pts1[nf])
+          v_c20 = np.array(self.pts2[nf])
+          # get velocities
+          v_v1 = (v_c1 - v_c10)/nf
+          v_v2 = (v_c2 - v_c20)/nf
+          v_deltav = v_v2 - v_v1
+          # extrapolate distance at collision
+          impact_distance = self.extrapolateDistance(v_dist, v_deltav)
+          if impact_distance < (r1+r2):
+            sawCollision=True
+            # analyze full kinematics
+            self.analyzeCollision(v_c1, v_c2, v_v1, v_v2, r1+r2)
+            # draw Collision
+            dist = int(self.CollisionResult['distance'])
+            angle = int( self.CollisionResult['angle'])
+            v_C = self.CollisionResult['Coordinates']
+            proton.drawCollision(frame, v_C, dist, angle)
+            self.resultFrame=frame.copy()
+            break
 
       # put text on first frames
       if self.nframes < 20:
