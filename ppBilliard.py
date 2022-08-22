@@ -39,7 +39,8 @@ class videoSource(object):
   def init(self):
     """(re-)initialize video input
 
-      VideoCapture.set() command codes
+    VideoCapture.set() command codes
+
       0. CV_CAP_PROP_POS_MSEC Current position of the video file in milliseconds.
       1. CV_CAP_PROP_POS_FRAMES 0-based index of the frame to be decoded/captured next.
       2. CV_CAP_PROP_POS_AVI_RATIO Relative position of the video file
@@ -60,6 +61,7 @@ class videoSource(object):
       17. CV_CAP_PROP_WHITE_BALANCE Currently unsupported
       18. CV_CAP_PROP_RECTIFICATION Rectification flag for stereo cameras 
           (note: only supported by DC1394 v 2.x backend currently)
+
   """
     
     if self.vStream is None or (
@@ -119,10 +121,10 @@ class hsvRangeFinder(object):
     state_paused = False
 
     print("\n  -->  Color calibration of trackable objects  <--")    
-    print(5*" ", " type commands in video window:") 
-    print(5*" ", "     's' to save, ")
-    print(5*" ", "     'p' to pause/resume input stream,")
-    print(5*" ", "     'q' or <esc> to exit\n")
+    print(9*" ", "type commands in video window:") 
+    print(9*" ", "  's' to save, ")
+    print(9*" ", "  'p' to pause/resume input stream,")
+    print(9*" ", "  'q' or <esc> to exit\n")
     
     while True:
       # Start reading the webcam feed frame by frame.
@@ -346,9 +348,8 @@ def blur_region(frame, xy, wxy, ksize=7):
   """Blur rectangular region  in frame 
 
       xy: tuple (x,y) of coordinates
-      wxy: tuple of x- and y-widht
-      region of interest: x + wx,  y + wy or 
-                          x +/- wx, y +/- wx if wx, wy negative
+      wxy: tuple of x- and y-width
+      region of interest: x + wx,  y + wy or x +/- wx, y +/- wx if wx, wy negative
   """
   x = xy[0]
   y = xy[1]
@@ -678,8 +679,13 @@ class ppBilliard(object):
     self.obj_col3 = [col3Lower, col3Upper]
     #col_blue = 100  # blue
 
+    # expected size of trackable objects (in pixels)
     self.obj_min_radius = 25
     self.obj_max_radius = 100
+    # scale factor for size of collision region
+    #  relative to the sum of the object radii 
+    self.fRcollision = 1.5
+    
     #
     # --- define video parameters
     #
@@ -703,11 +709,12 @@ class ppBilliard(object):
     time.sleep(0.5)
 
   def init(self):
-    """initialize new run"""
+    """initialize (new) run"""
     #
-    self.nframes = 0 #frame counter 
+    self.nframes = 0 # (re-)set frame counter 
     #
     # variables to store result
+    self.impactDistance = None
     self.CollisionResult = None
     self.resultFrame = None
     #
@@ -787,7 +794,7 @@ class ppBilliard(object):
     """ caluclate extrapolated distance at collision 
         assuming movement on straight trajectory
    
-      d_{extr}^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
+      d_0^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
 
       Input: 
 
@@ -797,6 +804,7 @@ class ppBilliard(object):
       Returns: 
           - extrapolated collision distance
             (assuming movement on staight line with constant velocity)
+
     """
     # coordinates
     dist_sq = np.inner(v_dist, v_dist)
@@ -804,6 +812,7 @@ class ppBilliard(object):
 
    # caluclate extrapolated distance assuming movement on straight trajectory
    #    d_{extr}^2 = v_{dist}^2 - (v_{dist} * v_deltav)^2 / v_deltav^2
+
     dextr_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
     return np.sqrt(dextr_sq)  
 
@@ -827,7 +836,7 @@ class ppBilliard(object):
           - Escore: collision energy [~cm²/s²] for object with mass 1
           - Iscore:    impact parameter[0, 1] 
           - Asymmetry: momentum asymmetry [-1, 1]
-          - Score:     Escore * IScore 
+          - Score:     Escore * Iscore 
     """
    #   coordinates in pixels, time in 1/framerate
    # collision point 
@@ -842,8 +851,8 @@ class ppBilliard(object):
     v2 = max(1, np.sqrt(np.inner(v_v2, v_v2)))
     v_deltav = v_v2 - v_v1
 
-    # extrapolate distance at collision
-    dist_extr = self.extrapolateDistance(v_dist, v_deltav)
+    # extrapolate distance at collision (already calulated erlier)
+    # self.impactDistance = self.extrapolateDistance(v_dist, v_deltav)
      
    # momentum in centre-of-mass system
     v_cms = v_v1 + v_v2
@@ -859,7 +868,7 @@ class ppBilliard(object):
    # impact parameter             
     #Iscore = 0.5 * (abs(np.inner(v_dist/dist, v_v1/v1) ) + 
     #                abs(np.inner(v_dist/dist, v_v2/v2) ) )
-    Iscore = 1. - dist_extr/dmax
+    Iscore = 1. - self.impactDistance/dmax
    # asymmetry
     Asym = np.sqrt(np.inner(v_cms,v_cms)) / (v1+v2)
     Asym = Asym if v1>v2 else -Asym
@@ -868,7 +877,7 @@ class ppBilliard(object):
     self.CollisionResult={
         'Coordinates' : (v_C[0], v_C[1]),
         'distance'    : dist,
-        'iDistance'   : dist_extr, 
+        'iDistance'   : self.impactDistance, 
         'angle'       : angle, 
         'Escore'      : Escore,
         'Iscore'      : Iscore,
@@ -892,7 +901,13 @@ class ppBilliard(object):
     print(" *", 10*" ", "    -->>>    ** ", d['Score'], " **     <<<--")
     
   def run(self):  
-    """Read Camera, track objects and detect Collision
+    """Main method of class ppBilliard 
+
+       - shows intro
+       - reads camera and tracks objects 
+       - detects collision
+       - determines collison parameters
+
     """
 
     # skip some frames after re-start in order to remove old ones
@@ -990,7 +1005,7 @@ class ppBilliard(object):
         v_c2 = np.array(xy2)
         v_dist = v_c2 - v_c1        
         dist = np.sqrt(np.inner(v_dist, v_dist))
-        if dist < 1.5*(r1+r2):  # objects (nearly) touched
+        if dist <  self.fRcollision * (r1+r2):  # objects (nearly) touched
           nf = 2
           v_c10 = np.array(self.pts1[nf])
           v_c20 = np.array(self.pts2[nf])
@@ -999,8 +1014,8 @@ class ppBilliard(object):
           v_v2 = (v_c2 - v_c20)/nf
           v_deltav = v_v2 - v_v1
           # extrapolate distance at collision
-          impact_distance = self.extrapolateDistance(v_dist, v_deltav)
-          if impact_distance < (r1+r2):
+          self.impactDistance = self.extrapolateDistance(v_dist, v_deltav)
+          if self.impactDistance < (r1+r2):
             sawCollision=True
             # analyze full kinematics
             self.analyzeCollision(v_c1, v_c2, v_v1, v_v2, r1+r2)
@@ -1091,6 +1106,73 @@ class ppBilliard(object):
     cv.destroyAllWindows()
 
 
+def run_Calibration():
+  """execute color calibration"""
+
+  hsv = hsvRangeFinder( videodev_id,
+                        v_width = 1024,
+                        v_height = 800,
+                        fps = 24,
+                        videoFile = args["video"])
+  hsv_dict=hsv.run()
+  if hsv_dict is not None:
+    fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
+    with open(fnam, 'w') as of: 
+      yaml.dump(hsv_dict, of, default_flow_style=True)
+    print("hsv range saved to file ",fnam) 
+  hsv.stop()
+    
+def run_ppBilliard():
+  """execute ppBillard"""
+  
+ # set paths to pp event pictures
+  wd = os.getcwd()
+  eventpath = '/events/'
+  lowScore= ('empty/', 'Cosmics/')
+  highScore = ('2e/', '2mu/', 'general/')
+  superScore = ('2mu2e/', '4mu/')
+    
+ # initialize video analysis
+  ppB = ppBilliard( videodev_id,
+                    v_width = 1024,
+                    v_height = 800,
+                    fps = 24,
+                    videoFile = args["video"])
+# -- loop 
+  key = ord('c') 
+  while key == ord('c') or key==ord(' '):
+    ppB.init()
+  # run video analysis from camera
+    result = ppB.run()
+    if result is None:
+      break
+  # show result 
+    frame = ppB.resultFrame
+    ppB.printCollisionResult()
+    score = result['Score']
+  # evaluate score, select event picture and show it
+    # print("  *==* Your score is", int(score) )
+    if score > 2000:
+      eventclass = random.choice(superScore)
+    elif score > 750:
+      eventclass = random.choice(highScore)
+    else:
+      eventclass = random.choice(lowScore)
+    path = os.getcwd()+eventpath+eventclass
+    filelist = os.listdir(path)
+    i = int(random.random() * len(filelist))
+    event_img = path+filelist[i]
+    # - show picture on video screen
+    key = ppB.showResult(event_img, score)
+      
+    if key == ord('c') or key == ord(' '):       
+      print("\n      running again ...\n")
+  # <-- end while key == ord('c')
+    
+  # clean up     
+  print("\n      bye, bye !\n")
+  ppB.stop()
+
 if __name__ == "__main__":  # ------------run it ----
 
 #
@@ -1112,69 +1194,24 @@ if __name__ == "__main__":  # ------------run it ----
   # print(args)
   
   videodev_id = args["source"] # video device number of webcam
-  if args['calibrate']:
-    # set up camera and interactive window
-    hsv = hsvRangeFinder( videodev_id,
-                          v_width = 1024,
-                          v_height = 800,
-                          fps = 24,
-                          videoFile = args["video"])
-    # run loop
-    hsv_dict=hsv.run()
-    if hsv_dict is not None:
-      fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
-      with open(fnam, 'w') as of: 
-        yaml.dump(hsv_dict, of, default_flow_style=True)
-      print("hsv range saved to file ",fnam) 
-    hsv.stop()
-  else:
-   #
-   # run ppBilliards
-   #
-   # set paths to pp event pictures
-    wd = os.getcwd()
-    eventpath = '/events/'
-    lowScore= ('empty/', 'Cosmics/')
-    highScore = ('2e/', '2mu/', 'general/')
-    superScore = ('2mu2e/', '4mu/')
-    
-   # initialize video analysis
-    ppB = ppBilliard( videodev_id,
-                      v_width = 1024,
-                      v_height = 800,
-                      fps = 24,
-                      videoFile = args["video"])
-  # -- loop 
-    key = ord('c') 
-    while key == ord('c') or key==ord(' '):
-      ppB.init()
-    # run video analysis from camera
-      result = ppB.run()
-      if result is None:
-        break
-    # show result 
-      frame = ppB.resultFrame
-      ppB.printCollisionResult()
-      score = result['Score']
-    # evaluate score, select event picture and show it
-      # print("  *==* Your score is", int(score) )
-      if score > 2000:
-        eventclass = random.choice(superScore)
-      elif score > 750:
-        eventclass = random.choice(highScore)
-      else:
-        eventclass = random.choice(lowScore)
-      path = os.getcwd()+eventpath+eventclass
-      filelist = os.listdir(path)
-      i = int(random.random() * len(filelist))
-      event_img = path+filelist[i]
-      # - show picture on video screen
-      key = ppB.showResult(event_img, score)
+
+  while args['calibrate']:
+    #
+    run_Calibration()
+    answ = input("  calibration done;\n" + \
+            "  type 'c' to continue with 2nd object or" + \
+            " 'r' to run ppBilliard -> " )
+    if answ == '1' :
+      args['calibrate'] = 1
+      run_Calibration()
+    elif answ == '2' :
+      args['calibrate'] = 2
+      run_Calibration()
+    elif answ =='r' :
+      args['calibrate'] = 0
+    else:  
+      print(20*' ', "bye, bye !")
+      quit()
       
-      if key == ord('c') or key == ord(' '):       
-        print("\n      running again ...\n")
-    # <-- end while key == ord('c')
-    
-    # clean up     
-    print("\n      bye, bye !\n")
-    ppB.stop()
+  run_ppBilliard()
+    #
