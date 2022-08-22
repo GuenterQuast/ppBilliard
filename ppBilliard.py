@@ -154,15 +154,15 @@ class hsvRangeFinder(object):
       # Filter image and get binary mask; white represents target color
       mask = cv.inRange(hsv, self.lower_range, self.upper_range)
       # Converting binary mask to 3 channel image for stacking it with others
-      mask_3 = cv.cvtColor(mask, cv.COLOR_GRAY2BGR)
+      mask_bgr = cv.cvtColor(mask, cv.COLOR_GRAY2BGR)
     
       # visualize the real part of the target color (Optional)
       result = cv.bitwise_and(frame, frame, mask=mask)
     
       # dispay mask, original and masked frames
-      stacked = np.hstack((mask_3, frame, result))    
-      # resize frame to 40% 
-      cv.imshow('Trackbars',cv.resize(stacked, None, fx=0.4, fy=0.4))
+      stacked = np.hstack((mask_bgr, frame, result))    
+      # resize frame to 50% 
+      cv.imshow('Trackbars', cv.resize(stacked, None, fx=0.5, fy=0.5))
     
       # <esc> or 'q'  exit the program
       key = cv.waitKey(1)
@@ -792,9 +792,13 @@ class ppBilliard(object):
   @staticmethod
   def extrapolateDistance(v_dist, v_deltav):  
     """ caluclate extrapolated distance at collision 
-        assuming movement on straight trajectory
-   
-      d_0^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
+    assuming movement on straight trajectory
+
+      time to collision: 
+        dt = - (v_dist * v_deltav)/deltav^2
+      
+      distance at collision: 
+        d_0^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
 
       Input: 
 
@@ -806,15 +810,12 @@ class ppBilliard(object):
             (assuming movement on staight line with constant velocity)
 
     """
-    # coordinates
+
     dist_sq = np.inner(v_dist, v_dist)
     deltav_sq = max(np.inner(v_deltav, v_deltav), 1)
 
-   # caluclate extrapolated distance assuming movement on straight trajectory
-   #    d_{extr}^2 = v_{dist}^2 - (v_{dist} * v_deltav)^2 / v_deltav^2
-
-    dextr_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
-    return np.sqrt(dextr_sq)  
+    d0_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
+    return np.sqrt(d0_sq)  
 
 
   def analyzeCollision(self, v_c1, v_c2, v_v1, v_v2, dmax):
@@ -1199,7 +1200,7 @@ if __name__ == "__main__":  # ------------run it ----
     #
     run_Calibration()
     answ = input("  calibration done;\n" + \
-            "  type 'c' to continue with 2nd object or" + \
+                 "  type '1' or '2' to continue calibrating,  or" + \
             " 'r' to run ppBilliard -> " )
     if answ == '1' :
       args['calibrate'] = 1
