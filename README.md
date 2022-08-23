@@ -1,4 +1,4 @@
-
+e
 ****************************************
 ## Project **p(roton)p(roton) Billiard**
 ****************************************
@@ -6,18 +6,24 @@
 About
 -----
 
-This Python code implements video tacking of colliding round colored objects
-to determine the kinematict parameters of a collision, like the equivalent
-centre-of-mass energy, impact parameter and asymmetry. These are scaled to
-correspond to the parameters of a proton-proton collision in a high-energy
-collider and pictures of the traces resulting from particle collision are
-shown. 
-
-The Python Code relies on the Open Source Computer Vision Library 
-[OpenCV](https://opencv.org/). Thanks to the developers for the 
-great work!
+Collide two balls on a table and see what happens if they
+were protons in the Large Hadron Collider at CERN.
 
 >   ![](ppBilliard.png)
+
+This project uses a table-top game board for video tacking of colliding
+round colored objects with a webcam.
+Collision parameters like the equivalent centre-of-mass energy,
+impact distance and asymmetry are automatically determined.
+These are scaled to correspond to the parameters of a proton-proton 
+collision in a high-energy collider and pictures of the traces resulting
+from particle collision are shown. 
+
+
+The Python Code here relies heavily on the Open Source Computer
+Vision Library [OpenCV](https://opencv.org/).  
+Thanks to the developers for the great work!
+
 
 
 Created by Guenter Quast, initial Version Aug. 2022 
@@ -52,7 +58,7 @@ Usually, the number of the video device for the webcam is 0; if
 not, use the parameter '-s n' with the device number 'n'.
 
 
-### Purpose of the Program
+### Usage of the Program
 
 Starting the Program without any other arguments than the device number 
 will display a short trailer and then switch to a display of the webcam
@@ -87,7 +93,7 @@ from the [CMS Detector](https://cms.cern) at CERN appears on the
 video screen.
 
 
-#### Further ideas
+### Further ideas
 
 This is just an initial version intended as a demonstrator. 
 
@@ -99,7 +105,7 @@ placing the camera in the latter scenario may be a challenge.
 
 The selection of collision images could be more sophisticated.
 As a result, a true competition of teams for the largest harvest
-of of interesting events could arise.
+of interesting events could arise.
 
 The present selection of collision events from the CMS experiment 
 can easily be replaced by collections of images from other sources.

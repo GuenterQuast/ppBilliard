@@ -284,17 +284,24 @@ class vMouse(object):
     return 0    
 # <-- end class vMouse
 
-def smoothImage(frame):
-  # blur it convert it to the HSV color space
-  blurred = cv.GaussianBlur(frame, (11, 11), 0)
+def smoothImage(frame, ksize=11):
+  # blur and convert it to HSV color space
+  blurred = cv.GaussianBlur(frame, (ksize, ksize), 0)
   return cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
 
 def findcircularObject_byColor(hsv_image,
                                colLower, colUpper,
                                rmin, rmax, algo = "Contours"):  
-  # construct a mask for the color range given by colLower - colUpper,
-  #  then perform a series of dilations and erosions to remove
-  #  any small blobs left in the mask
+  """Find a colored object in image in hsv color format by 
+  constructing a mask for the color range given by colLower - colUpper,
+  then performimg a series of dilations and erosions to remove noise.
+
+  Two algorithms are presently available:
+
+    - cv2.HoughCirles
+    - cv2.FindContours
+  """
+
   mask = cv.inRange(hsv_image, colLower, colUpper)
   mask = cv.erode(mask, None, iterations=2)
   mask = cv.dilate(mask, None, iterations=2)
@@ -335,7 +342,8 @@ def findcircularObject_byColor(hsv_image,
   return xy, r
 
 def plotTrace(frame, points, lw=3, color=(100,100,100)):
-  # draw list of points (an object trace)
+  """Draw list of points where object was found (an object trace)
+  """
   for i in range(1, len(points)):
     # if either of the tracked points are None, ignore them
     if points[i - 1] is None or points[i] is None:
