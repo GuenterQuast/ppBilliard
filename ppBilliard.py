@@ -28,9 +28,13 @@ class videoSource(object):
     """set parameters of video device"""
     # store iinput options
     self.vdev_id = vdev_id
-    self.cam_width = v_width
-    self.cam_height = v_height
-    self.cam_fps = fps
+    self.user_cwidth = v_width
+    self.user_cheight = v_height
+    self.user_cfps = fps
+    self.cam_width = None
+    self.cam_height = None
+    self.cam_fps = None
+    
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
   
@@ -68,15 +72,23 @@ class videoSource(object):
        self.vStream is not None and not self.vStream.isOpened()):
       if self.useCam:
         self.vStream = cv.VideoCapture(self.vdev_id)
-        if self.cam_width is not None:
-          self.vStream.set(3, self.cam_width)
-          # print("setting cam width: ", self.cam_width)
-        if self.cam_height is not None:
-          self.vStream.set(4, self.cam_height)
-          # print("setting cam height: ", self.cam_height)
-        if self.cam_fps is not None:
-          # print("setting cam fps: ", self.cam_fps)
-          self.vStream.set(5, self.cam_fps)  
+        if self.user_cwidth is not None:
+          #print("setting cam width: ", self.user_width)
+          self.vStream.set(3, self.user_cwidth)
+        if self.user_cheight is not None:
+          #print("setting cam height: ", self.user_height)
+          self.vStream.set(4, self.user_cheight)
+        if self.user_cfps is not None:
+          #print("setting cam fps: ", self.cam_fps)
+          self.vStream.set(5, self.user_cfps)
+     # check settings (camera may use settings only close to the desired ones)
+        self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
+        self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
+        self.cam_fps=self.vStream.get(cv.CAP_PROP_FPS)
+        print("setting camera - width {} ({}): ".format(self.cam_width, self.user_cwidth),
+              " height {} ({}):".format(self.cam_height, self.user_cheight),
+              " fps {} ({}]:\n".format(self.cam_fps, self.user_cfps) )
+        
       else:
         # otherwise, grab a reference to the video file
         self.vStream = cv.VideoCapture(self.videoFile)
@@ -233,7 +245,6 @@ class vMouse(object):
          - text:  optional text
          - returns integer id of button
     """
-    h, w = frame.shape[:2]
     # calculate coordinates of right-top corner
     rt = (lb[0]+w_pad, lb[1]-h_pad)
     # store button
@@ -611,7 +622,7 @@ class frameRate():
     if self.Nframes%10 == 0:
       self.rate = self.nframes/self.dt
       if not quiet:
-        print(self.ch_toggle[self.i],"      frame rate: ",
+        print(self.ch_toggle[self.i],"    measured fps: ",
               int(self.nframes/self.dt)
             , "/s     ", end='\r')
         self.i = 1 - self.i
@@ -1121,7 +1132,7 @@ def run_Calibration():
   hsv = hsvRangeFinder( videodev_id,
                         v_width = 1024,
                         v_height = 800,
-                        fps = 24,
+                        fps = 20,
                         videoFile = args["video"])
   hsv_dict=hsv.run()
   if hsv_dict is not None:
@@ -1143,9 +1154,9 @@ def run_ppBilliard():
     
  # initialize video analysis
   ppB = ppBilliard( videodev_id,
-                    v_width = 1024,
-                    v_height = 800,
-                    fps = 24,
+                    v_width = 980,
+                    v_height = 544,
+                    fps = 20,
                     videoFile = args["video"])
 # -- loop 
   key = ord('c') 
