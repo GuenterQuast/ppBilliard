@@ -141,7 +141,7 @@ class hsvRangeFinder(object):
     print(9*" ", "  'q' or <esc> to exit\n")
     
     while True:
-      # Start reading the webcam feed frame by frame.
+      # Start reading video stream frame by frame.
       if not state_paused:
         ret, frame = self.vs.read()
         if not ret:
@@ -405,13 +405,14 @@ def blur_circular_region(frame, xy, r, ksize=7):
   mask_circ = np.full( roi_shape, 0, dtype=np.uint8)
   cv.circle(mask_circ, (r, r), r, (255, 255, 255),  -1)
   invmask_circ = cv.bitwise_not(mask_circ)
- # create a temporary image for blurred version 
-  tmpImg = roi.copy()
-  tmpImg = cv.blur(tmpImg, (ksize, ksize))
- # copy blurred circle and background to its position in image
-  frame[max(0, y-r) : min(h, y+r), max(0, x-r) : min(w, x+r)] = \
-    cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_circ),
-            cv.bitwise_and(roi, roi, mask = invmask_circ) )
+  if(roi.shape[0]>ksize and roi.shape[1]>ksize):
+   # create a temporary image for blurred version 
+    tmpImg = roi.copy()
+    tmpImg = cv.blur(tmpImg, (ksize, ksize))
+   # copy blurred circle and background to its position in image
+    frame[max(0, y-r) : min(h, y+r), max(0, x-r) : min(w, x+r)] = \
+      cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_circ),
+              cv.bitwise_and(roi, roi, mask = invmask_circ) )
   return frame
 
 def blur_elliptical_region(frame, xy, ab, angle, ksize=7):
@@ -436,12 +437,13 @@ def blur_elliptical_region(frame, xy, ab, angle, ksize=7):
                  (255, 255, 255),  -1)
   invmask_ellipse = cv.bitwise_not(mask_ellipse)
  # create a temporary image for blurred version 
-  tmpImg = roi.copy()
-  tmpImg = cv.blur(tmpImg, (ksize, ksize))
- # copy blurred circle and background to its position in image
-  frame[max(0, y-w0) : min(h, y+w0), max(0, x-w0) : min(w, x+w0)] = \
-    cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_ellipse),
-            cv.bitwise_and(roi, roi, mask = invmask_ellipse) )
+  if(roi.shape[0]>ksize and roi.shape[1]>ksize):
+    tmpImg = roi.copy()
+    tmpImg = cv.blur(tmpImg, (ksize, ksize))
+   # copy blurred circle and background to its position in image
+    frame[max(0, y-w0) : min(h, y+w0), max(0, x-w0) : min(w, x+w0)] = \
+      cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_ellipse),
+              cv.bitwise_and(roi, roi, mask = invmask_ellipse) )
   return frame
 
 def crossfade(win, img1, img0, alpha0=0., nframes=20):
@@ -572,7 +574,7 @@ class proton(object):
 
     # put proton remnants inside
     c.draw(frame, x+R//5, y, 3*R//4, nobkg=True) 
-    c.draw(frame, x-R//5, y, 3*R//R, nobkg=True)
+    c.draw(frame, x-R//5, y, 3*R//4, nobkg=True)
 
     # some scattered quarks
     cq = c.cquark
@@ -595,10 +597,19 @@ class proton(object):
     if c.blur:
       _ = blur_elliptical_region(frame, v_C, (a,b), angle, ksize=max(2, R//4))
       
-def bgr2hsv(b, g, r):
+def bgr2hsv( bgr):
   # convert Blue-Green-Red to Hue-Saturation-Value
-  c = np.uint8([[[b, g, r]]])
-  return cv.cvtColor( c, cv.COLOR_BGR2HSV)
+  c = np.uint8([[bgr]])
+  _c = cv.cvtColor( c, cv.COLOR_BGR2HSV)[0][0]
+  # convert to tuple of int
+  return tuple([int(x) for x in _c])
+
+def hsv2bgr( hsv ):
+  # convert Hue-Saturation-Value to Blue-Green-Red
+  c = np.uint8([[hsv]])
+  _c = cv.cvtColor( c, cv.COLOR_HSV2BGR)[0][0]
+  # convert to tuple of int
+  return tuple([int(x) for x in _c])
 
 
 class frameRate():
@@ -632,8 +643,9 @@ class frameRate():
       self.nframes = 0
     return(self.rate)
 
-
+#
 #---  end helpers --------------------------------------------
+#
 
 class ppBilliard(object):
   """Track colored objects in a video and replace by symbolic Proton
@@ -700,6 +712,11 @@ class ppBilliard(object):
     self.obj_col3 = [col3Lower, col3Upper]
     #col_blue = 100  # blue
 
+    # set colors used for traces as average of upper and lower values,
+    # converted to brg color code
+    self.obj_bgr1 = hsv2bgr((self.obj_col1[0]+self.obj_col1[1])//2)
+    self.obj_bgr2 = hsv2bgr((self.obj_col2[0]+self.obj_col2[1])//2)
+    
     # expected size of trackable objects (in pixels)
     self.obj_min_radius = 25
     self.obj_max_radius = 100
@@ -810,8 +827,9 @@ class ppBilliard(object):
     # cross-fade to camera image 
     frame = crossfade(self.WNam, frame, tmpimg)
 
+  
   @staticmethod
-  def extrapolateDistance(v_dist, v_deltav):  
+  def extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2):
     """ caluclate extrapolated distance at collision 
     assuming movement on straight trajectory
 
@@ -823,21 +841,25 @@ class ppBilliard(object):
 
       Input: 
 
-        - 2d-vector distance of objects
-        - 2d-vector velocity difference 
+        - 2d-vectos positions object 1 and 2 
+        - 2d-vector velocities object 1 and 2
 
       Returns: 
-          - extrapolated collision distance
+          - 2d vectors of positions 1 and 2 at collision
+          - collision distance
             (assuming movement on staight line with constant velocity)
-
     """
-
+    v_dist = v_c2 - v_c1        
+    v_deltav = v_v2 - v_v1
     dist_sq = np.inner(v_dist, v_dist)
     deltav_sq = max(np.inner(v_deltav, v_deltav), 1)
-
+    dt = -np.inner(v_dist, v_deltav)/deltav_sq
+    # print('dt=',dt)
+    
     d0_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
-    return np.sqrt(d0_sq)  
-
+    v_c01 = v_c1 + v_v1 * dt
+    v_c02 = v_c2 + v_v2 * dt
+    return v_c01, v_c02, np.sqrt(d0_sq)  
 
   def analyzeCollision(self, v_c1, v_c2, v_v1, v_v2, dmax):
     """ analyze kinematics of collision of two objects
@@ -860,21 +882,20 @@ class ppBilliard(object):
           - Asymmetry: momentum asymmetry [-1, 1]
           - Score:     Escore * Iscore 
     """
-   #   coordinates in pixels, time in 1/framerate
-   # collision point 
-    v_C = np.int32(0.5*(v_c1 + v_c2))
-   # distance of object centers when near colliding
-    v_dist = v_c2 - v_c1
-    dist_sq = np.inner(v_dist, v_dist)
-    dist = np.sqrt(dist_sq)
+   # all coordinates in pixels, time in 1/framerate
+
+   # point of closest approach
+    v_C0 = np.int32(0.5*(self.v_c01 + self.v_c02))
+
+   # distance of object centers when colliding
+    v_dist = self.v_c02 - self.v_c01
     angle = int(np.arctan2(v_dist[1], v_dist[0]) * 180/np.pi) 
    # velocities in pixels/time_beweeen_frames
     v1 = max(1, np.sqrt(np.inner(v_v1, v_v1)))
     v2 = max(1, np.sqrt(np.inner(v_v2, v_v2)))
-    v_deltav = v_v2 - v_v1
 
-    # extrapolate distance at collision (already calulated erlier)
-    # self.impactDistance = self.extrapolateDistance(v_dist, v_deltav)
+   # extrapolate distance at collision (already calulated erlier)
+    #   self.v_C0, self.impactDistance = self.extrapolate2CollisionPoint
      
    # momentum in centre-of-mass system
     v_cms = v_v1 + v_v2
@@ -897,14 +918,13 @@ class ppBilliard(object):
     # construct total score (centre-of-mass energy * impact)
     Score = int(Escore * Iscore)
     self.CollisionResult={
-        'Coordinates' : (v_C[0], v_C[1]),
-        'distance'    : dist,
-        'iDistance'   : self.impactDistance, 
-        'angle'       : angle, 
-        'Escore'      : Escore,
-        'Iscore'      : Iscore,
-        'Asymmetry'   : Asym,
-        'Score'       : Score                          }           
+        'iCoordinates' : (v_C0[0], v_C0[1]),
+        'iDistance'    : self.impactDistance, 
+        'angle'        : angle, 
+        'Escore'       : Escore,
+        'Iscore'       : Iscore,
+        'Asymmetry'    : Asym,
+        'Score'        : Score                          }           
 
   def printCollisionResult(self):
     """Print collsion parameters"""
@@ -915,8 +935,10 @@ class ppBilliard(object):
     
     print("\n\n *  -->>> Collision detected <<<--*")
     d = self.CollisionResult
-    print(" *           distance: {:.3g} ".format(d['distance']),
-               "  impact distance: {:.3g}".format(d['iDistance']) )      
+    print(" * at ({},{}),   impact distance: {:.3g}".\
+          format(d['iCoordinates'][0], 
+                 d['iCoordinates'][1], 
+                 d['iDistance']) )      
     print(" *    scores: energy: {:.4g}  ".format(d['Escore']) +
           "impact: {:.2g}  ".format(d['Iscore']) +
           "asymmetry: {:.2f}".format(d['Asymmetry']) )
@@ -953,14 +975,19 @@ class ppBilliard(object):
 
       # empty video buffer 
       if rate.Nframes <= nskip:
-        print ('!!! skipping frame ', rate.Nframes)
+        # print ('!!! skipping frame ', rate.Nframes)
         continue
+
+      if not self.useCam:
+        # slow down to approx. 20 frames/sec if reading from video stream
+        cv.waitKey(50)
+          
 
       self.nframes +=1   # count frames
 
       if self.nframes == 1: # frame number one
         h, w = frame.shape[:2]
-        print("  Video resolution: {:d}x{:d}".format(w, h))
+        # print("  Video resolution: {:d}x{:d}".format(w, h))
         self.scaleVideo = False
         if w > self.max_video_width:
           self.scaleVideo = True
@@ -1014,8 +1041,8 @@ class ppBilliard(object):
         frame = cv.addWeighted(frame, 0.75, self.bkgimg, 0.25, 0.)
 
       # plot object traces from list of tracked points    
-      plotTrace(frame, self.pts1, lw=2, color=(0, 0, 100) )
-      plotTrace(frame, self.pts2, lw=2, color=(0, 100, 100))
+      plotTrace(frame, self.pts1, lw=2, color=self.obj_bgr1 )
+      plotTrace(frame, self.pts2, lw=2, color=self.obj_bgr2 )
   
       # check for collisions of objects
       sawCollision = False
@@ -1034,17 +1061,17 @@ class ppBilliard(object):
           # get velocities
           v_v1 = (v_c1 - v_c10)/nf
           v_v2 = (v_c2 - v_c20)/nf
-          v_deltav = v_v2 - v_v1
-          # extrapolate distance at collision
-          self.impactDistance = self.extrapolateDistance(v_dist, v_deltav)
+          # extrapolate to collision point
+          self.v_c01, self.v_c02, self.impactDistance = \
+              self.extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2)
           if self.impactDistance < (r1+r2):
             sawCollision=True
             # analyze full kinematics
             self.analyzeCollision(v_c1, v_c2, v_v1, v_v2, r1+r2)
             # draw Collision
-            dist = int(self.CollisionResult['distance'])
+            dist = int(self.CollisionResult['iDistance'])
             angle = int( self.CollisionResult['angle'])
-            v_C = self.CollisionResult['Coordinates']
+            v_C = self.CollisionResult['iCoordinates']
             proton.drawCollision(frame, v_C, dist, angle)
             self.resultFrame=frame.copy()
             break
