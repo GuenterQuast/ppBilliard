@@ -74,13 +74,15 @@ class videoSource(object):
         self.vStream = cv.VideoCapture(self.vdev_id)
         if self.user_cwidth is not None:
           #print("setting cam width: ", self.user_width)
-          self.vStream.set(3, self.user_cwidth)
+          self.vStream.set(cv.CAP_PROP_FRAME_WIDTH,
+                           self.user_cwidth)
         if self.user_cheight is not None:
           #print("setting cam height: ", self.user_height)
-          self.vStream.set(4, self.user_cheight)
+          self.vStream.set(cv.CAP_PROP_FRAME_HEIGHT,
+                           self.user_cheight)
         if self.user_cfps is not None:
           #print("setting cam fps: ", self.cam_fps)
-          self.vStream.set(5, self.user_cfps)
+          self.vStream.set(cv.CAP_PROP_FPS, self.user_cfps)
      # check settings (camera may use settings only close to the desired ones)
         self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
         self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
@@ -117,15 +119,15 @@ class hsvRangeFinder(object):
     self.vs = self.vSource.init()
 
     # create a window named trackbars.
-    cv.namedWindow("Trackbars")
+    cv.namedWindow("ColorCalibration")
     # create 6 trackbars to control the lower and upper range of HSV parameters
     #    0 < =H <= 179, 0 <= S <= 255, 0 <= V <= 255
-    cv.createTrackbar("L - H", "Trackbars", 0, 179, self.do_nothing)
-    cv.createTrackbar("L - S", "Trackbars", 0, 255, self.do_nothing)
-    cv.createTrackbar("L - V", "Trackbars", 0, 255, self.do_nothing)
-    cv.createTrackbar("U - H", "Trackbars", 179, 179, self.do_nothing)
-    cv.createTrackbar("U - S", "Trackbars", 255, 255, self.do_nothing)
-    cv.createTrackbar("U - V", "Trackbars", 255, 255, self.do_nothing)
+    cv.createTrackbar("L - H", "ColorCalibration", 0, 179, self.do_nothing)
+    cv.createTrackbar("L - S", "ColorCalibration", 0, 255, self.do_nothing)
+    cv.createTrackbar("L - V", "ColorCalibration", 0, 255, self.do_nothing)
+    cv.createTrackbar("U - H", "ColorCalibration", 179, 179, self.do_nothing)
+    cv.createTrackbar("U - S", "ColorCalibration", 255, 255, self.do_nothing)
+    cv.createTrackbar("U - V", "ColorCalibration", 255, 255, self.do_nothing)
 
   def run(self):
 
@@ -152,12 +154,12 @@ class hsvRangeFinder(object):
         hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
     
       # Get trackbar value in real timem
-      l_h = cv.getTrackbarPos("L - H", "Trackbars")
-      l_s = cv.getTrackbarPos("L - S", "Trackbars")
-      l_v = cv.getTrackbarPos("L - V", "Trackbars")
-      u_h = cv.getTrackbarPos("U - H", "Trackbars")
-      u_s = cv.getTrackbarPos("U - S", "Trackbars")
-      u_v = cv.getTrackbarPos("U - V", "Trackbars")
+      l_h = cv.getTrackbarPos("L - H", "ColorCalibration")
+      l_s = cv.getTrackbarPos("L - S", "ColorCalibration")
+      l_v = cv.getTrackbarPos("L - V", "ColorCalibration")
+      u_h = cv.getTrackbarPos("U - H", "ColorCalibration")
+      u_s = cv.getTrackbarPos("U - S", "ColorCalibration")
+      u_v = cv.getTrackbarPos("U - V", "ColorCalibration")
  
       # Set lower and upper HSV range according value selected by trackbar
       self.lower_range = np.array([l_h, l_s, l_v])
@@ -174,7 +176,7 @@ class hsvRangeFinder(object):
       # dispay mask, original and masked frames
       stacked = np.hstack((mask_bgr, frame, result))    
       # resize frame to 50% 
-      cv.imshow('Trackbars', cv.resize(stacked, None, fx=0.5, fy=0.5))
+      cv.imshow('ColorCalibration', cv.resize(stacked, None, fx=0.5, fy=0.5))
     
       # <esc> or 'q'  exit the program
       key = cv.waitKey(1)
@@ -1219,8 +1221,8 @@ if __name__ == "__main__":  # ------------run it ----
     #
     run_Calibration()
     answ = input("  calibration done;\n" + \
-                 "  type '1' or '2' to continue calibrating,  or" + \
-            " 'r' to run ppBilliard -> " )
+                 "  type '1' or '2' to continue calibrating,\n" +\
+                 "   'r' to run ppBilliard or anything else to quit-> " )
     if answ == '1' :
       args['calibrate'] = 1
       run_Calibration()
