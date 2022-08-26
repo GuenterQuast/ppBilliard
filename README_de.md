@@ -1,5 +1,5 @@
 ****************************************
-## Projekt **p(roton)p(roton) Billiard**
+## Projekt **P(roton)P(roton) Billiard**
 ****************************************
 
 Übersicht
@@ -32,10 +32,10 @@ Auf einer Standard-Python-Umgebung (>3.6) wird die OpenCV-Bibliothek
 
 > `pip3 install opencv-python` installiert.
 
-Nachdem Sie das *ppBilliard*-Paket heruntergeladen haben, geben Sie ein: 
+Nachdem Sie das *ppBilliard*-Paket heruntergeladen haben, geben Sie
 
 ```
-  ppBilliard.py -h``
+  python3 ppBilliard.py -h
 ```
 
 auf der Kommandozeile ein, was die folgende Ausgabe erzeugt:
@@ -45,34 +45,33 @@ auf der Kommandozeile ein, was die folgende Ausgabe erzeugt:
                        [-c CALIBRATE]
 
   optionale Argumente:
-    -h, --help diese Hilfemeldung anzeigen und beenden
-    -f, --fullscreen Ausführen im Vollbildmodus
+    -h, --help         diese Hilfemeldung anzeigen und beenden
+    -f, --fullscreen   Ausführen im Vollbildmodus
     -v VIDEO, --video VIDEO
-                          Pfad zur einer (optionalen) Videodatei
+                       Pfad zur einer (optionalen) Videodatei
     -b BUFFER, --Puffer BUFFER
-                          maximale Puffergröße für Objektspuren
+                       maximale Puffergröße für Objektspuren
     -s SOURCE, --Quelle SOURCE
-                          Nummer des Videogeräts
+                       Nummer des Videogeräts
     -c CALIBRATE, --kalibrieren CALIBRATE
-                          hsv-Bereich des verfolgbaren Objekts finden <1/2>
+                       hsv-Bereich des verfolgbaren Objekts finden <1/2>
 ```
 
 Normalerweise ist die Nummer des Videogeräts für die Webcam 0; falls 
 nicht, verwenden Sie den Parameter '-s n' mit der Gerätenummer 'n'.
 
 
-### Verwendung des Programms
+### Umgang mit dem Programm *ppBilliard.py*
 
 Wenn Sie das Programm ohne andere Argumente als die Gerätenummer starten 
-wird ein kurzer Trailer angezeigt und dann auf die Anzeige der Webcam
-Ausgabe. Wenn ein verfolgbares Objekt wie ein farbiger Ball oder Kreis
-identifiziert wird, wird es durch eine symbolische, animierte Darstellung
-eines Protons ersetzt und im Video verfolgt, während Sie es herumbewegen.
+wird ein kurzer Trailer angezeigt und dann auf die Anzeige der Webcam-
+Ausgabe umgeschaltet. Wenn ein verfolgbares Objekt wie ein farbiger Ball 
+oder Kreis identifiziert wird, wird es durch eine symbolische, animierte Darstellung eines Protons ersetzt und im Video verfolgt, während Sie es herumbewegen.
 
 Wenn kein Objekt erkannt wird, ist ein Kalibrierungsschritt erforderlich.
 Schließen Sie das Programm durch Eingabe von `<esc>` oder 'q' im Videofenster
 und starten Sie es erneut mit dem Parameter '-c 1', um die Farbparameter für
-das erste Objekt im 'hsv-Farbraum' (Farbton, Sättigung, Wert) einzustellen. 
+das erste Objekt im "*hsv*-Farbraum" (Farbton, Sättigung, Wert) einzustellen. 
 Das Verfahren funktioniert interaktiv in einem grafischen Fenster -
 stellen Sie die minimalen und maximalen *hsv*-Werte so ein, dass nur das
 Objekt 1 im rechten Videofenster deutlich sichtbar ist. Tippen Sie 's'
@@ -84,9 +83,10 @@ haben muss als Objekt 1!
 Starten Sie das Programm neu und verschieben Sie die Objekte.  Die Objekte 
 sollten nun erkannt werden und ihre runden Formen durch symbolische,
 animierte Darstellungen von Protonen ersetzt werden.
-Wenn sich die Spuren der Objekte näher kommen als die Summe der Radien
-der beiden Objekte, wird eine "Kollision" erkannt und die Kollisionsparameter
-werden ausgedruckt:  
+Wenn sich die Spuren der Objekte nahe genug kommen und ihre extrapolierten
+Spuren näher als die Summe der Radien beieinander liegen, wird eine 
+"Kollision" erkannt und die Kollisionsparameter werden auf dem Bildschirm
+angezeigt:  
 die äquivalente Schwerpunktsenergie (in Einheiten von cm²/s²
 (unter der Annahme einer Bildauflösung von 10 Pixeln/cm) für ein Objekt
 einer Masseneinheit), der Stoßparameter (0 bis 1) und die
@@ -117,9 +117,7 @@ Szenario eine Herausforderung sein.
 
 Die Auswahl der Kollisionsbilder könnte deutlich ausgefeilter sein.
 So könnte ein echter Wettbewerb der Teams um die größte Ausbeute
-von interessanten Ereignissen entstehen.
-
-Die derzeitige Auswahl von Kollisionsereignissen aus dem CMS-Experiment 
-kann leicht durch Sammlungen von Bildern aus anderen Quellen ersetzt werden.
+von interessanten Ereignissen entstehen. Die derzeitige Auswahl von Kollisionsereignissen aus dem CMS-Experiment kann leicht durch Sammlungen 
+von Bildern aus anderen Quellen ersetzt werden.
 
 **Bitte tragen Sie bei!**
