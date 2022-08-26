@@ -37,6 +37,7 @@ class videoSource(object):
     
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
+    self.videoFPS = 14          # frame rate for video playback
   
     self.vStream = None # no open video stream yet
   
@@ -130,6 +131,7 @@ class hsvRangeFinder(object):
     cv.createTrackbar("U - V", "ColorCalibration", 255, 255, self.do_nothing)
 
   def run(self):
+    """Main Method to run calibration"""
 
     hsv_dict = None  #output dictionary
     state_paused = False
@@ -140,6 +142,8 @@ class hsvRangeFinder(object):
     print(9*" ", "  'p' to pause/resume input stream,")
     print(9*" ", "  'q' or <esc> to exit\n")
     
+    # wait time between frames for camera/video playback
+    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS) 
     while True:
       # Start reading video stream frame by frame.
       if not state_paused:
@@ -179,7 +183,7 @@ class hsvRangeFinder(object):
       cv.imshow('ColorCalibration', cv.resize(stacked, None, fx=0.5, fy=0.5))
     
       # <esc> or 'q'  exit the program
-      key = cv.waitKey(1)
+      key = cv.waitKey(wait_time)
       if (key == ord('p')):
         # toggle paused state
         state_paused = not state_paused
@@ -201,7 +205,7 @@ class hsvRangeFinder(object):
   # --- end class hsvRangeFinder
 
 class vMouse(object):
-  """provides basic mouse functionality in video windwo
+  """provides basic mouse functionality in video window
   """
 
   def  __init__(self, window):
@@ -552,9 +556,9 @@ class proton(object):
          - vector to center of collision (int, in pixels)
          - distance vector between protons (int, in pixels)
     """
-
+    h, w = frame.shape[:2]
     # distance between collisions
-    R = (2*dist)//3
+    R = max(w//30, (2*dist)//3)
     x = v_C[0]
     y = v_C[1]
     sign= 1 if random.random()>0.5 else -1
@@ -663,7 +667,7 @@ class ppBilliard(object):
     self.vSource=videoSource(vdev_id, v_width, v_height, fps, videoFile)
     self.videoFile = self.vSource.videoFile
     self.vs = self.vSource.vStream
-      
+    
     # properties of trackable objects
     hsv_from_file = True # get colors from yaml-file if true
     
@@ -722,13 +726,13 @@ class ppBilliard(object):
     self.obj_max_radius = 100
     # scale factor for size of collision region
     #  relative to the sum of the object radii 
-    self.fRcollision = 1.5
+    self.fRcollision = 1.25
     
     #
     # --- define video parameters
     #
     # width of video
-    self.max_video_width = 1024 # 800 or 600 if CPU limits
+    self.max_video_width = 1024 # or 800 or 600 if CPU limits
 
     self.pts1 = deque(maxlen=args["buffer"]) # queue for object1 xy
     self.pts2 = deque(maxlen=args["buffer"]) # queue for object2 xy
@@ -945,7 +949,7 @@ class ppBilliard(object):
     print(" *", 10*" ", "    -->>>    ** ", d['Score'], " **     <<<--")
     
   def run(self):  
-    """Main method of class ppBilliard 
+    """Main method to run ppBilliard 
 
        - shows intro
        - reads camera and tracks objects 
@@ -961,27 +965,24 @@ class ppBilliard(object):
     # initialize frame rate counter
     rate = frameRate()
     #
+    # wait time between frames for camera/video playback
+    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS) 
+    
     # --- start loop over video frames 
     while self.vs.isOpened():
-
       # grab current frame
       ret, frame= self.vs.read()
       self.framerate = rate.timeit()
       
       # end of video file reached ?
       if frame is None:
-        print ('no frame recieved - ending!')
+        print ('None recieved from video stream - ending!')
         break
 
       # empty video buffer 
       if rate.Nframes <= nskip:
         # print ('!!! skipping frame ', rate.Nframes)
         continue
-
-      if not self.useCam:
-        # slow down to approx. 20 frames/sec if reading from video stream
-        cv.waitKey(50)
-          
 
       self.nframes +=1   # count frames
 
@@ -1084,8 +1085,7 @@ class ppBilliard(object):
       
       # show the frame on screen
       cv.imshow(self.WNam, frame)
-
-      key = cv.waitKey(1) & 0xFF
+      key = cv.waitKey(wait_time) & 0xFF
       # if the <esc> key is pressed, stop the loop
       if (key == 27) or (key == ord('q')):
         # end  
@@ -1094,6 +1094,7 @@ class ppBilliard(object):
         # pause
           cv.waitKey(-1) # wait until any key pressed
 
+          
     return self.CollisionResult
     # <-- end of loop
 

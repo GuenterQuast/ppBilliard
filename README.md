@@ -92,6 +92,13 @@ Depending on the "intensity" of the collision, an event picture
 from the [CMS Detector](https://cms.cern) at CERN appears on the
 video screen.
 
+As a demonstration, you may want to run the program on a prepared 
+video file:
+
+```
+     python3 ppBilliard.py -v videos/softball.webm
+```
+
 
 ### Further ideas
 
