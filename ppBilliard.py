@@ -779,9 +779,15 @@ class ppBilliard(object):
     #
     # load background image to be overlayed on webcam frames
     try:
-      self.bkgimg = cv.imread('images/RhoZ_empty.png', cv.IMREAD_COLOR)
+      self.bkgimg = cv.imread('images/RhoZ_empty.png', cv.IMREAD_UNCHANGED)
+      if self.bkgimg.shape[2] == 4:
+        self.bkgimg_has_alpha = True
+      else:
+        self.bkgimg_has_alpha = False
     except:
       self.bkgimg = None
+      print("* ppBilliard.init: no background image found !")
+
 
     # init video device and return video stream  
     self.vs = self.vSource.init()
@@ -1015,10 +1021,10 @@ class ppBilliard(object):
           self.bkgimg = cv.resize(self.bkgimg, (self.swidth, self.sheight),
                              interpolation=cv.INTER_AREA)
         # playground central region
-        xmin = 0.2 * self.swidth
-        xmax = 0.8 * self.swidth
-        ymin = 0.2 * self.sheight
-        ymax = 0.8 * self.sheight
+        xmin = 0.25 * self.swidth
+        xmax = 0.75 * self.swidth
+        ymin = 0.25 * self.sheight
+        ymax = 0.75 * self.sheight
         
       # resize frame (may save computation time)
       if self.scaleVideo:
@@ -1058,7 +1064,12 @@ class ppBilliard(object):
 
       # add detector contours 
       if self.bkgimg is not None:
-        frame = cv.addWeighted(frame, 0.75, self.bkgimg, 0.25, 0.)
+        if self.bkgimg_has_alpha:
+          frame = cv.addWeighted(cv.cvtColor(frame, cv.COLOR_BGR2BGRA),
+             0.75, self.bkgimg, 0.25, 0.)
+        else:
+          frame = cv.addWeighted(frame,
+             0.8, self.bkgimg, 0.2, 0.)
 
       # plot object traces from list of tracked points    
       plotTrace(frame, self.pts1, lw=2, color=self.obj_bgr1 )
