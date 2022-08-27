@@ -332,6 +332,7 @@ def findcircularObject_byColor(hsv_image,
     - cv2.FindContours
   """
 
+
   mask = cv.inRange(hsv_image, colLower, colUpper)
   mask = cv.erode(mask, None, iterations=2)
   mask = cv.dilate(mask, None, iterations=2)
@@ -739,7 +740,7 @@ class ppBilliard(object):
     self.obj_max_radius = 100
     # scale factor for size of collision region
     #  relative to the sum of the object radii 
-    self.fRcollision = 1.25
+    self.fRcollision = 1.9
     
     #
     # --- define video parameters
@@ -1255,7 +1256,7 @@ if __name__ == "__main__":  # ------------run it ----
 	help="run in fullscreen mode")
   ap.add_argument("-v", "--video",
 	help="path to the (optional) video file")
-  ap.add_argument("-b", "--buffer", type=int, default=32,
+  ap.add_argument("-b", "--buffer", type=int, default=15,
 	          help="max buffer size for object traces")
   ap.add_argument("-s", "--source", type=int, default=0,
 	help="videodevice number")
