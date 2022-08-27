@@ -37,7 +37,7 @@ class videoSource(object):
     
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
-    self.videoFPS = 14          # frame rate for video playback
+    self.videoFPS = 15          # frame rate for video playback
   
     self.vStream = None # no open video stream yet
   
@@ -84,6 +84,19 @@ class videoSource(object):
         if self.user_cfps is not None:
           #print("setting cam fps: ", self.cam_fps)
           self.vStream.set(cv.CAP_PROP_FPS, self.user_cfps)
+
+     # !!! test !!! improve color contrasts
+     #      these settings depend strongly on camera model !
+     #   hue = -20 # normal is 0
+     #   self.vStream.set(cv.CAP_PROP_HUE, hue)
+     #   print("hue  {}  ({})".format(self.vStream.get(cv.CAP_PROP_HUE),hue))
+     #   sat = 100 # normal is 64
+     #   self.vStream.set(cv.CAP_PROP_SATURATION, sat)
+     #   print("sat  {}  ({})".format(self.vStream.get(cv.CAP_PROP_SATURATION),sat))
+     #   exp = 20
+     #   self.vStream.set(cv.CAP_PROP_EXPOSURE, exp)
+     #   print("exp  {}  ({})".format(self.vStream.get(cv.CAP_PROP_EXPOSURE),exp))
+          
      # check settings (camera may use settings only close to the desired ones)
         self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
         self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
@@ -1000,7 +1013,12 @@ class ppBilliard(object):
         if self.bkgimg is not None:
           self.bkgimg = cv.resize(self.bkgimg, (self.swidth, self.sheight),
                              interpolation=cv.INTER_AREA)
-          
+        # playground central region
+        xmin = 0.15 * self.swidth
+        xmax = 0.85 * self.swidth
+        ymin = 0.15 * self.sheight
+        ymax = 0.85 * self.sheight
+        
       # resize frame (may save computation time)
       if self.scaleVideo:
         frame = cv.resize(frame, (self.swidth, self.sheight),
@@ -1055,7 +1073,10 @@ class ppBilliard(object):
         v_c2 = np.array(xy2)
         v_dist = v_c2 - v_c1        
         dist = np.sqrt(np.inner(v_dist, v_dist))
-        if dist <  self.fRcollision * (r1+r2):  # objects (nearly) touched
+        # check for collsion in central region of playground
+        if (xmin < v_c1[0] < xmax) and (xmin < v_c2[0] < xmax) and\
+           (ymin < v_c1[1] < ymax) and (ymin < v_c2[1] < ymax) and\
+           (dist <  self.fRcollision * (r1+r2)):  # objects (nearly) touched
           nf = 2
           v_c10 = np.array(self.pts1[nf])
           v_c20 = np.array(self.pts2[nf])
@@ -1160,9 +1181,9 @@ def run_Calibration():
   """execute color calibration"""
 
   hsv = hsvRangeFinder( videodev_id,
-                        v_width = 1024,
-                        v_height = 800,
-                        fps = 20,
+                        v_width = 800,
+                        v_height = 600,
+                        fps = 15,
                         videoFile = args["video"])
   hsv_dict=hsv.run()
   if hsv_dict is not None:
@@ -1184,9 +1205,9 @@ def run_ppBilliard():
     
  # initialize video analysis
   ppB = ppBilliard( videodev_id,
-                    v_width = 980,
-                    v_height = 544,
-                    fps = 20,
+                    v_width = 600,
+                    v_height = 800,
+                    fps = 30,
                     videoFile = args["video"])
 # -- loop 
   key = ord('c') 
