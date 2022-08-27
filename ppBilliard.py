@@ -735,7 +735,7 @@ class ppBilliard(object):
     self.obj_bgr2 = hsv2bgr((self.obj_col2[0]+self.obj_col2[1])//2)
     
     # expected size of trackable objects (in pixels)
-    self.obj_min_radius = 25
+    self.obj_min_radius = 15
     self.obj_max_radius = 100
     # scale factor for size of collision region
     #  relative to the sum of the object radii 
@@ -1014,10 +1014,10 @@ class ppBilliard(object):
           self.bkgimg = cv.resize(self.bkgimg, (self.swidth, self.sheight),
                              interpolation=cv.INTER_AREA)
         # playground central region
-        xmin = 0.15 * self.swidth
-        xmax = 0.85 * self.swidth
-        ymin = 0.15 * self.sheight
-        ymax = 0.85 * self.sheight
+        xmin = 0.2 * self.swidth
+        xmax = 0.8 * self.swidth
+        ymin = 0.2 * self.sheight
+        ymax = 0.8 * self.sheight
         
       # resize frame (may save computation time)
       if self.scaleVideo:
