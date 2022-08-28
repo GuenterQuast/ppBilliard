@@ -607,9 +607,9 @@ class ppBilliard(object):
                      np.array([25,250,255], dtype=np.int16)] if\
       'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)    
     # width of video (1024, or 800, 600 if CPU limits
-    self.max_video_width = 1024 if 'maxVideoWidht' in cD else \
+    self.max_video_width = 1024 if 'maxVideoWidth' not in cD else \
                            cD['maxVideoWidth']
-    self.bkgImageName = 'RhoZ_black.png' if 'bkgImage' in cD else \
+    self.bkgImageName = 'RhoZ_black.png' if 'bkgImage' not in cD else \
                         cD['bkgImage']
     self.introImageName =  'ppBilliard_intro.png' if 'introImage' not in cD \
                            else cD['introImage']
