@@ -66,8 +66,7 @@ class videoSource(object):
       17. CV_CAP_PROP_WHITE_BALANCE Currently unsupported
       18. CV_CAP_PROP_RECTIFICATION Rectification flag for stereo cameras 
           (note: only supported by DC1394 v 2.x backend currently)
-
-  """
+    """
     
     if self.vStream is None or (
        self.vStream is not None and not self.vStream.isOpened()):
@@ -156,20 +155,22 @@ class hsvRangeFinder(object):
     print(9*" ", "  'q' or <esc> to exit\n")
     
     # wait time between frames for camera/video playback
-    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS) 
+    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS)
+    iFrame = 0
     while True:
       # Start reading video stream frame by frame.
       if not state_paused:
         ret, frame = self.vs.read()
         if not ret:
           break
-
-        # Flip the frame horizontally (Not required)
-        #frame = cv.flip( frame, 1 ) # 0:x 1:y -1:x & y
-    
         # Convert the BGR image to HSV image.
         hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
-    
+        iFrame += 1
+        
+      if iFrame == 1:        
+        h, w = frame.shape[:2]
+        sf = 0.3 if w>1000 else 0.4 if w>750 else 0.5
+        
       # Get trackbar value in real timem
       l_h = cv.getTrackbarPos("L - H", "ColorCalibration")
       l_s = cv.getTrackbarPos("L - S", "ColorCalibration")
@@ -191,9 +192,9 @@ class hsvRangeFinder(object):
       result = cv.bitwise_and(frame, frame, mask=mask)
     
       # dispay mask, original and masked frames
-      stacked = np.hstack((mask_bgr, frame, result))    
-      # resize frame to 50% 
-      cv.imshow('ColorCalibration', cv.resize(stacked, None, fx=0.5, fy=0.5))
+      stacked = np.hstack((frame, mask_bgr, result))    
+      # resize frame
+      cv.imshow('ColorCalibration', cv.resize(stacked, None, fx=sf, fy=sf))
     
       # <esc> or 'q'  exit the program
       key = cv.waitKey(wait_time)
@@ -205,7 +206,7 @@ class hsvRangeFinder(object):
       elif(key == 27) or (key == ord('q')):
         return hsv_dict
       elif key == ord('s'):
-        # save and return if user presses `s`
+        # save and return if user presses 's'
         hsv_dict = {'hsv_l' : [l_h, l_s, l_v],
                     'hsv_h' : [u_h, u_s, u_v] }
         return hsv_dict
@@ -686,7 +687,7 @@ class ppBilliard(object):
     hsv_from_file = True # get colors from yaml-file if true
     
     # read colors of trackable objects in hsv-format from files (if present)
-    col_pink = 165  # pink 
+    col_pink = 165  # green 
     if hsv_from_file:
       try:
         fn = 'object1_hsv.yml'  
@@ -695,17 +696,19 @@ class ppBilliard(object):
           self.obj_col1 = [np.array(d['hsv_l'], dtype=np.int16),
                            np.array(d['hsv_h'], dtype=np.int16)]
       except:
+        # green rubber ball (from demo video)
         print("!!! reading file " + fn + " failed, using defaults")  
-        col1Lower = (col_pink - 5, 140, 140)
-        col1Upper = (col_pink + 5, 220, 220)
-        self.obj_col1 = [col1Lower, col1Upper]
+        col1Lower = (22, 0, 58)
+        col1Upper = (51, 255, 210)
+        self.obj_col1 = [np.array(col1Lower, dtype=np.int16),
+                         np.array(col1Upper, dtype=np.int16)]
     else:
-      col1Lower = (col_pink - 5, 140, 140)
-      col1Upper = (col_pink + 5, 220, 220)
-      self.obj_col1 = [col1Lower, col1Upper]
+      col1Lower = (22, 0, 58)
+      col1Upper = (51, 255, 210)
+      self.obj_col1 = [np.array(col1Lower, dtype=np.int16),
+                         np.array(col1Upper, dtype=np.int16)]
 
     # color range of 2nd object (pink):
-    col_yel = 18    # dark yellow
     if hsv_from_file:
       try:
         fn = 'object2_hsv.yml'  
@@ -714,24 +717,20 @@ class ppBilliard(object):
           self.obj_col2 = [np.array(d['hsv_l'],dtype=np.int16),
                            np.array(d['hsv_h'], dtype=np.int16)]
       except:
+        # red rubber ball (from demo video)
         print("!!! reading file " + fn + " failed, using defaults")  
-        col2Lower = (col_yel - 5, 65, 150) 
-        col2Upper = (col_yel + 5, 200, 200)
-        self.obj_col2 = [col2Lower, col2Upper]
+        col2Lower = (0, 90, 60) 
+        col2Upper = (25, 250, 255)
+        self.obj_col2 = [np.array(col2Lower, dtype=np.int16),
+                         np.array(col2Upper, dtype=np.int16)]
     else:
-      col2Lower = (col_yel - 5, 65, 150) 
-      col2Upper = (col_yel + 5, 200, 200)
-      self.obj_col2 = [col2Lower, col2Upper]
+      col2Lower = (0, 90, 60) 
+      col2Upper = (25, 250, 255)
+      self.obj_col2 = [np.array(col2Lower, dtype=np.int16),
+                       np.array(col2Upper, dtype=np.int16)]
 
-    # color range of reserve object (light-green):
-    col_green = 55  # green (RGB: 0, 255, 0)
-    col3Lower = (col_green - 10, 60, 60)
-    col3Upper = (col_green + 10, 200, 200)
-    self.obj_col3 = [col3Lower, col3Upper]
-    #col_blue = 100  # blue
-
-    # set colors used for traces as average of upper and lower values,
-    # converted to brg color code
+    # set colors used for object traces:
+    #  average of upper and lower values, converted to brg color code
     self.obj_bgr1 = hsv2bgr((self.obj_col1[0]+self.obj_col1[1])//2)
     self.obj_bgr2 = hsv2bgr((self.obj_col2[0]+self.obj_col2[1])//2)
     

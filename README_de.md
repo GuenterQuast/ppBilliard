@@ -96,28 +96,34 @@ Abhängig von der "Intensität" der Kollision wird dann ein Ereignisbild
 aus dem [CMS-Detektor] (https://cms.cern) am CERN auf dem
 Video-Bildschirm  angezeigt. 
 
-Zur Demonstration können Sie das Programm mit einer vorbereiteten 
-Videodatei ausführen:
-
+Beispiel
+--------
+Zur Demonstration können Sie das Programm auf eine vorbereitete Videodatei
+anwenden, die kurze Sequenzen von Zusammenstößen zwischen einem roten und
+einem grünen Gummiball zeigt. Führen Sie einfach
 ```
-     python3 ppBilliard.py -v videos/softball.webm
+     python3 ppBilliard.py -v videos/Flummies.webm
 ```
+auf der Kommandozeile aus.
+Die notwendigen Kalibrierungsdateien für die Farberkennung sind im
+Paket enthalten. Wenn Sie die Kalibrierung selbst ausprobieren möchten,
+fügen Sie die Option "-c 1" hinzu. 
 
 
 ### Weitere Ideen
 
 Dies ist nur eine erste Version, die als Demonstrator gedacht ist. 
 
-Die "Objekte" in einer endgültigen Version sollten bunte Bälle oder Kuglen
+Die "Objekte" in einer endgültigen Version sollten bunte Bälle oder Kugeln
 auf einem interessanten Spielfeld sein, die von zwei Spielern gekickt
-werden. Das Spielfeld könnte ein einfaches Speilbrett für eine mobile Version
+werden. Das Spielfeld könnte ein einfaches Spielbrett für eine mobile Version
 sein, oder auch ein echtes Spielfeld mit (farbigen) Fußbällen auf einem
 Sportplatz - allerdings dürfte die Platzierung der Kamera in letzterem
 Szenario eine Herausforderung sein. 
 
 Die Auswahl der Kollisionsbilder könnte deutlich ausgefeilter sein.
 So könnte ein echter Wettbewerb der Teams um die größte Ausbeute
-von interessanten Ereignissen entstehen. Die derzeitige Auswahl von Kollisionsereignissen aus dem CMS-Experiment kann leicht durch Sammlungen 
-von Bildern aus anderen Quellen ersetzt werden.
+von interessanten Ereignissen entstehen. Die derzeitige Auswahl von Kollisionsereignissen aus dem CMS-Experiment kann leicht durch 
+Sammlungen von Bildern aus anderen Quellen ersetzt werden.
 
 **Bitte tragen Sie bei!**
