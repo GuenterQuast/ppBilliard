@@ -23,7 +23,7 @@ class videoSource(object):
   """Set up video stream"""
   
   def __init__(self, vdev_id=0,
-               v_width=None, v_height=None, fps=24,
+               v_width=None, v_height=None, fps=None,
                videoFile=None, videoFPS=None):
     """set parameters of video device"""
     # store iinput options
@@ -103,7 +103,7 @@ class videoSource(object):
         self.cam_fps=self.vStream.get(cv.CAP_PROP_FPS)
         print("setting camera - width {} ({}): ".format(self.cam_width, self.user_cwidth),
               " height {} ({}):".format(self.cam_height, self.user_cheight),
-              " fps {} ({}]:\n".format(self.cam_fps, self.user_cfps) )
+              " fps {} ({}):\n".format(self.cam_fps, self.user_cfps) )
         
       else:
         # otherwise, grab a reference to the video file
@@ -590,7 +590,7 @@ class ppBilliard(object):
     videoFPS = None if 'defaultVideFPS' not in cD else cD['defaultVideoFPS']
     # parameters of web-cam
     v_width = None if 'camWidth' not in cD else cD['camWidth']
-    v_heidht = None if 'camHeight' not in cD else cD['camHeight']
+    v_height = None if 'camHeight' not in cD else cD['camHeight']
     fps = None if 'camFPS' not in cD else cD['camFPS']
     # size of trackable objects
     self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
@@ -1260,7 +1260,6 @@ if __name__ == "__main__":  # ------------run it ----
  # initialize video analysis
   ppB = ppBilliard( confDict,
                     videodev_id,
-                    v_width = 800, v_height = 600, fps = 30,
                     videoFile = args["video"])
   
   # run calibration in a loop if desired
