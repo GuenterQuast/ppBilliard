@@ -741,6 +741,8 @@ class ppBilliard(object):
     # scale factor for size of collision region
     #  relative to the sum of the object radii 
     self.fRcollision = 1.9
+    # fractional size of target region
+    self.fTarget =1./9.
     
     #
     # --- define video parameters
@@ -750,6 +752,21 @@ class ppBilliard(object):
 
     self.pts1 = deque(maxlen=args["buffer"]) # queue for object1 xy
     self.pts2 = deque(maxlen=args["buffer"]) # queue for object2 xy
+
+    # load background image to be overlayed on webcam frames
+    try:
+      self.bkgimg = cv.imread('images/RhoZ_black.png')
+      h, w = self.bkgimg.shape[:2]
+      sf = np.sqrt(self.fTarget)/2.
+      cv.rectangle( self.bkgimg,
+                    ( int( (0.5-sf)*w), int( (0.5+sf)*h) ),
+                    ( int( (0.5+sf)*w), int( (0.5-sf)*h) ),
+                    (20,255,45), 3)
+    except:
+      self.bkgimg = None
+      print("* ppBilliard.init: no background image found !")
+
+
     
     #
     # --- output greeter
@@ -777,12 +794,6 @@ class ppBilliard(object):
     self.pts1.clear() # queue for object1 xy
     self.pts2.clear() # queue for object2 xy
     #
-    # load background image to be overlayed on webcam frames
-    try:
-      self.bkgimg = cv.imread('images/RhoZ_black.png')
-    except:
-      self.bkgimg = None
-      print("* ppBilliard.init: no background image found !")
 
     # init video device and return video stream  
     self.vs = self.vSource.init()
@@ -978,7 +989,7 @@ class ppBilliard(object):
     
     # initialize frame rate counter
     rate = frameRate()
-    #
+    
     # wait time between frames for camera/video playback
     wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS) 
     
@@ -1015,10 +1026,11 @@ class ppBilliard(object):
           self.bkgimg = cv.resize(self.bkgimg, (self.swidth, self.sheight),
                              interpolation=cv.INTER_AREA)
         # playground central region
-        xmin = 0.25 * self.swidth
-        xmax = 0.75 * self.swidth
-        ymin = 0.25 * self.sheight
-        ymax = 0.75 * self.sheight
+        sf = np.sqrt(self.fTarget)/2.
+        xtar_mn = int( (0.5-sf) * self.swidth)
+        xtar_mx = int( (0.5+sf) * self.swidth)
+        ytar_mn = int( (0.5-sf) * self.sheight)
+        ytar_mx = int( (0.5+sf) * self.sheight)
         
       # resize frame (may save computation time)
       if self.scaleVideo:
@@ -1058,7 +1070,7 @@ class ppBilliard(object):
 
       # add detector contours 
       if self.bkgimg is not None:
-        frame = cv.addWeighted(frame, 0.5, self.bkgimg, 0.5, 0.)
+        frame = cv.addWeighted(frame, 0.65, self.bkgimg, 0.35, 0.)
 
       # plot object traces from list of tracked points    
       plotTrace(frame, self.pts1, lw=2, color=self.obj_bgr1 )
@@ -1075,8 +1087,8 @@ class ppBilliard(object):
         v_dist = v_c2 - v_c1        
         dist = np.sqrt(np.inner(v_dist, v_dist))
         # check for collsion in central region of playground
-        if (xmin < v_c1[0] < xmax) and (xmin < v_c2[0] < xmax) and\
-           (ymin < v_c1[1] < ymax) and (ymin < v_c2[1] < ymax) and\
+        if (xtar_mn < v_c1[0] < xtar_mx) and (xtar_mn < v_c2[0] < xtar_mx) and\
+           (ytar_mn < v_c1[1] < ytar_mx) and (ytar_mn < v_c2[1] < ytar_mx) and\
            (dist <  self.fRcollision * (r1+r2)):  # objects (nearly) touched
           nf = 2
           v_c10 = np.array(self.pts1[nf])
