@@ -107,8 +107,11 @@ einem grünen Gummiball zeigt. Führen Sie einfach
 auf der Kommandozeile aus.
 Die notwendigen Kalibrierungsdateien für die Farberkennung sind im
 Paket enthalten. Wenn Sie die Kalibrierung selbst ausprobieren möchten,
-fügen Sie die Option "-c 1" hinzu. 
-
+fügen Sie die Option "-c 1" hinzu.  
+Dieses einfache Arrangement wurde mit einem roten und einem grünen
+Flummi von etwa 2,5 cm Durchmesser auf einem schwarzen Tuch
+mit einer USB-Kamera bei einer Auflösung von 800x600 Pixeln mit
+30 Bildern/s aufgenommen. 
 
 ### Weitere Ideen
 

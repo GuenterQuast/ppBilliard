@@ -104,7 +104,10 @@ from the command line. The necessary calibration files for
 the color detection are included in the package. If you
 want to try out the calibration yourself, just add the
 "-c 1" option. 
-
+This simple arrangement was realized using a red and a green
+rubber ball of approximately 2.5 cm diameter on a black cloth
+recorded with a USB-camera with a resolution of 800x600 pixels
+at 30 frames/s. 
 
 ### Further ideas
 

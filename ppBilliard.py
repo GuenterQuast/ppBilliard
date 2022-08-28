@@ -24,7 +24,7 @@ class videoSource(object):
   
   def __init__(self, vdev_id=0,
                v_width=None, v_height=None, fps=24,
-               videoFile=None):
+               videoFile=None, videoFPS=None):
     """set parameters of video device"""
     # store iinput options
     self.vdev_id = vdev_id
@@ -37,7 +37,8 @@ class videoSource(object):
     
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
-    self.videoFPS = 15          # frame rate for video playback
+    # frame rate for video playback
+    self.videoFPS = 15 if videoFPS is None else VideoFPS   
   
     self.vStream = None # no open video stream yet
   
@@ -118,103 +119,6 @@ class hsvRangeFinder(object):
       - initialize webcam
       - interactively find hsv-range of trackable object
   """
-
-  # A required callback method that goes into the trackbar function.
-  @staticmethod
-  def do_nothing(x):
-    pass
-  
-  def __init__(self, vdev_id=0,
-               v_width=None, v_height=None, fps=None,
-               videoFile=None):
-    
-    self.vSource=videoSource(vdev_id, v_width, v_height, fps, videoFile)
-    self.vs = self.vSource.init()
-
-    # create a window named trackbars.
-    cv.namedWindow("ColorCalibration")
-    # create 6 trackbars to control the lower and upper range of HSV parameters
-    #    0 < =H <= 179, 0 <= S <= 255, 0 <= V <= 255
-    cv.createTrackbar("L - H", "ColorCalibration", 0, 179, self.do_nothing)
-    cv.createTrackbar("L - S", "ColorCalibration", 0, 255, self.do_nothing)
-    cv.createTrackbar("L - V", "ColorCalibration", 0, 255, self.do_nothing)
-    cv.createTrackbar("U - H", "ColorCalibration", 179, 179, self.do_nothing)
-    cv.createTrackbar("U - S", "ColorCalibration", 255, 255, self.do_nothing)
-    cv.createTrackbar("U - V", "ColorCalibration", 255, 255, self.do_nothing)
-
-  def run(self):
-    """Main Method to run calibration"""
-
-    hsv_dict = None  #output dictionary
-    state_paused = False
-
-    print("\n  -->  Color calibration of trackable objects  <--")    
-    print(9*" ", "type commands in video window:") 
-    print(9*" ", "  's' to save, ")
-    print(9*" ", "  'p' to pause/resume input stream,")
-    print(9*" ", "  'q' or <esc> to exit\n")
-    
-    # wait time between frames for camera/video playback
-    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS)
-    iFrame = 0
-    while True:
-      # Start reading video stream frame by frame.
-      if not state_paused:
-        ret, frame = self.vs.read()
-        if not ret:
-          break
-        # Convert the BGR image to HSV image.
-        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
-        iFrame += 1
-        
-      if iFrame == 1:        
-        h, w = frame.shape[:2]
-        sf = 0.3 if w>1000 else 0.4 if w>750 else 0.5
-        
-      # Get trackbar value in real timem
-      l_h = cv.getTrackbarPos("L - H", "ColorCalibration")
-      l_s = cv.getTrackbarPos("L - S", "ColorCalibration")
-      l_v = cv.getTrackbarPos("L - V", "ColorCalibration")
-      u_h = cv.getTrackbarPos("U - H", "ColorCalibration")
-      u_s = cv.getTrackbarPos("U - S", "ColorCalibration")
-      u_v = cv.getTrackbarPos("U - V", "ColorCalibration")
- 
-      # Set lower and upper HSV range according value selected by trackbar
-      self.lower_range = np.array([l_h, l_s, l_v])
-      self.upper_range = np.array([u_h, u_s, u_v])
-    
-      # Filter image and get binary mask; white represents target color
-      mask = cv.inRange(hsv, self.lower_range, self.upper_range)
-      # Converting binary mask to 3 channel image for stacking it with others
-      mask_bgr = cv.cvtColor(mask, cv.COLOR_GRAY2BGR)
-    
-      # visualize the real part of the target color (Optional)
-      result = cv.bitwise_and(frame, frame, mask=mask)
-    
-      # dispay mask, original and masked frames
-      stacked = np.hstack((frame, mask_bgr, result))    
-      # resize frame
-      cv.imshow('ColorCalibration', cv.resize(stacked, None, fx=sf, fy=sf))
-    
-      # <esc> or 'q'  exit the program
-      key = cv.waitKey(wait_time)
-      if (key == ord('p')):
-        # toggle paused state
-        state_paused = not state_paused
-      elif (key == ord(' ') or key == ord('r')):
-        state_paused = False
-      elif(key == 27) or (key == ord('q')):
-        return hsv_dict
-      elif key == ord('s'):
-        # save and return if user presses 's'
-        hsv_dict = {'hsv_l' : [l_h, l_s, l_v],
-                    'hsv_h' : [u_h, u_s, u_v] }
-        return hsv_dict
-
-  def stop(self):
-    # Finally, release camera & destroy windows.    
-    self.vSource.stop()
-    cv.destroyAllWindows()
 
   # --- end class hsvRangeFinder
 
@@ -670,91 +574,78 @@ class ppBilliard(object):
   """Track colored objects in a video and replace by symbolic Proton
   """
 
-  def __init__(self, vdev_id=0,
+  def __init__(self, confDict, vdev_id=0,
                v_width=None, v_height=None, fps=24,
                videoFile=None):
 
     self.first = True # first round
-    self.playIntro = True # show intro if true
     self.useCam = True if videoFile is None else False
 
-    # set-up class managing video source
-    self.vSource=videoSource(vdev_id, v_width, v_height, fps, videoFile)
-    self.videoFile = self.vSource.videoFile
-    self.vs = self.vSource.vStream
-    
-    # properties of trackable objects
-    hsv_from_file = True # get colors from yaml-file if true
-    
-    # read colors of trackable objects in hsv-format from files (if present)
-    col_pink = 165  # green 
-    if hsv_from_file:
-      try:
-        fn = 'object1_hsv.yml'  
-        with open(fn, 'r') as fs:
-          d = yaml.load(fs, Loader=yaml.Loader)
-          self.obj_col1 = [np.array(d['hsv_l'], dtype=np.int16),
-                           np.array(d['hsv_h'], dtype=np.int16)]
-      except:
-        # green rubber ball (from demo video)
-        print("!!! reading file " + fn + " failed, using defaults")  
-        col1Lower = (22, 0, 58)
-        col1Upper = (51, 255, 210)
-        self.obj_col1 = [np.array(col1Lower, dtype=np.int16),
-                         np.array(col1Upper, dtype=np.int16)]
-    else:
-      col1Lower = (22, 0, 58)
-      col1Upper = (51, 255, 210)
-      self.obj_col1 = [np.array(col1Lower, dtype=np.int16),
-                         np.array(col1Upper, dtype=np.int16)]
+    # initialize parameters
+    #   take values from configuration dictionary if not None
+    cD = confDict if confDict is not None else {}
 
-    # color range of 2nd object (pink):
-    if hsv_from_file:
-      try:
-        fn = 'object2_hsv.yml'  
-        with open(fn, 'r') as fs:
-          d = yaml.load(fs, Loader=yaml.Loader)
-          self.obj_col2 = [np.array(d['hsv_l'],dtype=np.int16),
-                           np.array(d['hsv_h'], dtype=np.int16)]
-      except:
-        # red rubber ball (from demo video)
-        print("!!! reading file " + fn + " failed, using defaults")  
-        col2Lower = (0, 90, 60) 
-        col2Upper = (25, 250, 255)
-        self.obj_col2 = [np.array(col2Lower, dtype=np.int16),
-                         np.array(col2Upper, dtype=np.int16)]
-    else:
-      col2Lower = (0, 90, 60) 
-      col2Upper = (25, 250, 255)
-      self.obj_col2 = [np.array(col2Lower, dtype=np.int16),
-                       np.array(col2Upper, dtype=np.int16)]
+    self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
+    # default frame rate for replay of video files
+    videoFPS = None if 'defaultVideFPS' not in cD else cD['defaultVideoFPS']
+    # parameters of web-cam
+    v_width = None if 'camWidth' not in cD else cD['camWidth']
+    v_heidht = None if 'camHeight' not in cD else cD['camHeight']
+    fps = None if 'camFPS' not in cD else cD['camFPS']
+    # size of trackable objects
+    self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
+    self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
+    # scale factor for size of collision region relative to sum of object radii 
+    self.fRcollision = 1.9 if 'fRcollsion' not in cD else cD['fRcollision']
+    # fractional size of target region
+    self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']
+    # default colors of trackable objects (default green and red objcts)
+    self.obj_col1 = [np.array([22,0,58], dtype=np.int16),
+                     np.array([51,255,210], dtype=np.int16)] if\
+      'obj_col1' not in cD else np.array(cD['obj_col1'], dtype=np.int16)
+    self.obj_col2 = [np.array([0,90,60], dtype=np.int16),
+                     np.array([25,250,255], dtype=np.int16)] if\
+      'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)    
+    # width of video (1024, or 800, 600 if CPU limits
+    self.max_video_width = 1024 if 'maxVideoWidht' in cD else \
+                           cD['maxVideoWidth']
+    self.bkgImageName = 'RhoZ_black.png' if 'bkgImage' in cD else \
+                        cD['bkgImage']
+    self.introImageName =  'ppBilliard_intro.png' if 'introImage' not in cD \
+                           else cD['introImage']
+    
+    # read colors of trackable object from calibration files (if present)
+    #   color range of 1st object:
+    try:
+      fn = 'object1_hsv.yml'  
+      with open(fn, 'r') as fs:
+        d = yaml.load(fs, Loader=yaml.Loader)
+        self.obj_col1 = [np.array(d['hsv_l'], dtype=np.int16),
+                         np.array(d['hsv_h'], dtype=np.int16)]
+    except:
+      print("  no file " + fn + ", using color defaults")  
+
+    # color range of 2nd object:
+    try:
+      fn = 'object2_hsv.yml'  
+      with open(fn, 'r') as fs:
+        d = yaml.load(fs, Loader=yaml.Loader)
+        self.obj_col2 = [np.array(d['hsv_l'],dtype=np.int16),
+                         np.array(d['hsv_h'], dtype=np.int16)]
+    except:
+      print("  no file " + fn + ", using color defaults")  
 
     # set colors used for object traces:
     #  average of upper and lower values, converted to brg color code
     self.obj_bgr1 = hsv2bgr((self.obj_col1[0]+self.obj_col1[1])//2)
     self.obj_bgr2 = hsv2bgr((self.obj_col2[0]+self.obj_col2[1])//2)
     
-    # expected size of trackable objects (in pixels)
-    self.obj_min_radius = 15
-    self.obj_max_radius = 100
-    # scale factor for size of collision region
-    #  relative to the sum of the object radii 
-    self.fRcollision = 1.9
-    # fractional size of target region
-    self.fTarget =1./9.
-    
-    #
-    # --- define video parameters
-    #
-    # width of video
-    self.max_video_width = 1024 # or 800 or 600 if CPU limits
-
     self.pts1 = deque(maxlen=args["buffer"]) # queue for object1 xy
     self.pts2 = deque(maxlen=args["buffer"]) # queue for object2 xy
 
     # load background image to be overlayed on webcam frames
     try:
-      self.bkgimg = cv.imread('images/RhoZ_black.png')
+      self.bkgimg = cv.imread('images/'+ self.bkgImageName, cv.IMREAD_COLOR)
       h, w = self.bkgimg.shape[:2]
       sf = np.sqrt(self.fTarget)/2.
       cv.rectangle( self.bkgimg,
@@ -763,19 +654,20 @@ class ppBilliard(object):
                     (20,255,45), 3)
     except:
       self.bkgimg = None
-      print("* ppBilliard.init: no background image found !")
-
-
-    
+      print("* ppBilliard.init: no background image found !")    
+    #
+    # set-up class managing video source
+    self.vSource=videoSource(vdev_id,
+                             v_width, v_height, fps,
+                             videoFile, videoFPS)
+    self.videoFile = self.vSource.videoFile
     #
     # --- output greeter
-    #  
-    print("\n Script ", sys.argv[0], " executing")
     if self.useCam:
       print("  reading video device ", videodev_id)
     else:  
       print("  reading from file ", self.videoFile)
-    print("      type 'q' or <esc> to exit in video window\n")
+    print("\n      type 'q' or <esc> to exit in video window\n")
 
     # allow the camera or video file to warm up
     time.sleep(0.5)
@@ -798,7 +690,7 @@ class ppBilliard(object):
     self.vs = self.vSource.init()
         
     # create video window for program output (webcam + tracked objects)
-    self.WNam = "VWin"
+    self.WNam = "ppBilliard"
     cv.namedWindow(self.WNam, cv.WINDOW_AUTOSIZE)
     if args["fullscreen"]:
       cv.setWindowProperty(self.WNam,
@@ -806,12 +698,98 @@ class ppBilliard(object):
                          cv.WINDOW_FULLSCREEN)
     # initialize mouse in video
     self.mouse = vMouse(self.WNam)
+
+  # A required callback method that goes into the trackbar function.
+  @staticmethod
+  def do_nothing(x):
+    pass
+  
+  def runCalibration(self):
+    """Main Method to run calibration"""
+
+    hsv_dict = None  #output dictionary
+    state_paused = False
+
+    # create a window for object masks and trackbars
+    WN = self.WNam
+    cv.namedWindow(WN)
+    # create 6 trackbars to control the lower and upper range of HSV parameters
+    #    0 < =H <= 179, 0 <= S <= 255, 0 <= V <= 255
+    cv.createTrackbar("L - H", WN, 0, 179, self.do_nothing)
+    cv.createTrackbar("L - S", WN, 0, 255, self.do_nothing)
+    cv.createTrackbar("L - V", WN, 0, 255, self.do_nothing)
+    cv.createTrackbar("U - H", WN, 179, 179, self.do_nothing)
+    cv.createTrackbar("U - S", WN, 255, 255, self.do_nothing)
+    cv.createTrackbar("U - V", WN, 255, 255, self.do_nothing)
+        
+    print("\n  -->  Color calibration of trackable objects  <--")    
+    print(9*" ", "type commands in video window:") 
+    print(9*" ", "  's' to save, ")
+    print(9*" ", "  'p' to pause/resume input stream,")
+    print(9*" ", "  'q' or <esc> to exit\n")
+
+    # wait time between frames for camera/video playback
+    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS)
+    iFrame = 0
+    while True:
+      # Start reading video stream frame by frame.
+      if not state_paused:
+        ret, frame = self.vs.read()
+        if not ret:
+          break
+        # Convert the BGR image to HSV image.
+        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+        iFrame += 1
+        
+      if iFrame == 1:        
+        h, w = frame.shape[:2]
+        sf = 0.3 if w>1000 else 0.4 if w>750 else 0.5
+        
+      # Get trackbar value in real timem
+      l_h = cv.getTrackbarPos("L - H", WN)
+      l_s = cv.getTrackbarPos("L - S", WN)
+      l_v = cv.getTrackbarPos("L - V", WN)
+      u_h = cv.getTrackbarPos("U - H", WN)
+      u_s = cv.getTrackbarPos("U - S", WN)
+      u_v = cv.getTrackbarPos("U - V", WN)
+ 
+      # Set lower and upper HSV range according value selected by trackbar
+      self.lower_range = np.array([l_h, l_s, l_v])
+      self.upper_range = np.array([u_h, u_s, u_v])
+    
+      # Filter image and get binary mask; white represents target color
+      mask = cv.inRange(hsv, self.lower_range, self.upper_range)
+      # Converting binary mask to 3 channel image for stacking it with others
+      mask_bgr = cv.cvtColor(mask, cv.COLOR_GRAY2BGR)
+    
+      # visualize the real part of the target color (Optional)
+      result = cv.bitwise_and(frame, frame, mask=mask)
+    
+      # dispay mask, original and masked frames
+      stacked = np.hstack((frame, mask_bgr, result))    
+      # resize frame
+      cv.imshow(WN, cv.resize(stacked, None, fx=sf, fy=sf))
+    
+      # <esc> or 'q'  exit the program
+      key = cv.waitKey(wait_time)
+      if (key == ord('p')):
+        # toggle paused state
+        state_paused = not state_paused
+      elif (key == ord(' ') or key == ord('r')):
+        state_paused = False
+      elif(key == 27) or (key == ord('q')):
+        return hsv_dict
+      elif key == ord('s'):
+        # save and return if user presses 's'
+        hsv_dict = {'hsv_l' : [l_h, l_s, l_v],
+                    'hsv_h' : [u_h, u_s, u_v] }
+        return hsv_dict
     
   def showIntro(self, frame):
     """Play a short sequence of frames as introduction
     """
     h, w = frame.shape[:2]
-    img = cv.imread('ppBilliard_intro.png', cv.IMREAD_COLOR)
+    img = cv.imread('images/'+self.introImageName, cv.IMREAD_COLOR)
     img = cv.resize(img, (w, h), interpolation=cv.INTER_AREA)
 
     # animate two protons on Intro image
@@ -1188,24 +1166,24 @@ class ppBilliard(object):
     self.vSource.stop()
     cv.destroyAllWindows()
 
-
-def run_Calibration():
+def run_Calibration(ppBilliard_instance):
   """execute color calibration"""
 
-  hsv = hsvRangeFinder( videodev_id,
-                        v_width = 800,
-                        v_height = 600,
-                        fps = 15,
-                        videoFile = args["video"])
-  hsv_dict=hsv.run()
+  # (re-)initialize video stream
+  ppBilliard_instance.init()
+
+  hsv_dict=ppBilliard_instance.runCalibration()
+
   if hsv_dict is not None:
     fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
     with open(fnam, 'w') as of: 
       yaml.dump(hsv_dict, of, default_flow_style=True)
     print("hsv range saved to file ",fnam) 
-  hsv.stop()
+
+  cv.destroyAllWindows()
     
-def run_ppBilliard():
+  
+def run_ppBilliard(ppBilliard_instance):
   """execute ppBillard"""
   
  # set paths to pp event pictures
@@ -1215,23 +1193,17 @@ def run_ppBilliard():
   highScore = ('2e/', '2mu/', 'general/')
   superScore = ('2mu2e/', '4mu/')
     
- # initialize video analysis
-  ppB = ppBilliard( videodev_id,
-                    v_width = 600,
-                    v_height = 800,
-                    fps = 30,
-                    videoFile = args["video"])
 # -- loop 
   key = ord('c') 
   while key == ord('c') or key==ord(' '):
-    ppB.init()
+    ppBilliard_instance.init()
   # run video analysis from camera
-    result = ppB.run()
+    result = ppBilliard_instance.run()
     if result is None:
       break
   # show result 
-    frame = ppB.resultFrame
-    ppB.printCollisionResult()
+    frame = ppBilliard_instance.resultFrame
+    ppBilliard_instance.printCollisionResult()
     score = result['Score']
   # evaluate score, select event picture and show it
     # print("  *==* Your score is", int(score) )
@@ -1246,21 +1218,28 @@ def run_ppBilliard():
     i = int(random.random() * len(filelist))
     event_img = path+filelist[i]
     # - show picture on video screen
-    key = ppB.showResult(event_img, score)
+    key = ppBilliard_instance.showResult(event_img, score)
       
     if key == ord('c') or key == ord(' '):       
       print("\n      running again ...\n")
   # <-- end while key == ord('c')
-    
-  # clean up     
-  print("\n      bye, bye !\n")
-  ppB.stop()
 
 if __name__ == "__main__":  # ------------run it ----
+#
+# print greeting message
+  print("\n*==* Script ", sys.argv[0], " executing")
 
+# --- check if a configuration dictionary exists
+  confDict = None
+  try:
+    fnam = 'ppBconfig.yml'
+    with open(fnam, 'r') as f:
+      confDict = yaml.load(f, Loader=yaml.Loader)
+    print('  using config from file ' + fnam) 
+  except:
+    pass  
 #
 # --- parse the arguments
-#
   ap = argparse.ArgumentParser()
   ap.add_argument("-f", "--fullscreen", action='store_const',
         const=True, default = False,
@@ -1278,9 +1257,16 @@ if __name__ == "__main__":  # ------------run it ----
   
   videodev_id = args["source"] # video device number of webcam
 
+ # initialize video analysis
+  ppB = ppBilliard( confDict,
+                    videodev_id,
+                    v_width = 800, v_height = 600, fps = 30,
+                    videoFile = args["video"])
+  
+  # run calibration in a loop if desired
   while args['calibrate']:
     #
-    run_Calibration()
+    run_Calibration(ppB)
     answ = input("  calibration done;\n" + \
                  "  type '1' or '2' to continue calibrating,\n" +\
                  "   'r' to run ppBilliard or anything else to quit-> " )
@@ -1294,7 +1280,12 @@ if __name__ == "__main__":  # ------------run it ----
       args['calibrate'] = 0
     else:  
       print(20*' ', "bye, bye !")
+      ppB.stop()
       quit()
-      
-  run_ppBilliard()
-    #
+
+  # run proton proton Billiard
+  run_ppBilliard(ppB)
+  # clean up     
+  print("\n      bye, bye !\n")
+  ppB.stop()
+
