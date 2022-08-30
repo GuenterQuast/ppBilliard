@@ -81,6 +81,10 @@ class videoSource(object):
            self.vStream = cv.VideoCapture(self.vdev_id, cv.CAP_V4L2)
            rc = self.vStream.set(cv.CAP_PROP_FOURCC,
                                  cv.VideoWriter_fourcc(*'MJPG') )
+        elif os.name=='nt': # windows DSHOW + MJPG codec
+           self.vStream = cv.VideoCapture(self.vdev_id, cv.CAP_DSHOW)
+           rc = self.vStream.set(cv.CAP_PROP_FOURCC,
+                                 cv.VideoWriter_fourcc(*'MJPG') )
         else:
            self.vStream = cv.VideoCapture(self.vdev_id)
 
