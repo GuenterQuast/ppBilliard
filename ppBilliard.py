@@ -23,24 +23,27 @@ class videoSource(object):
   """Set up video stream"""
   
   def __init__(self, vdev_id=0,
-               v_width=None, v_height=None, fps=None, v_exposure=None, 
+               width=None, height=None, fps=None,
+               exposure=None, saturation=None, 
                videoFile=None, videoFPS=None):
     """set parameters of video device"""
     # store iinput options
     self.vdev_id = vdev_id
-    self.user_cwidth = v_width
-    self.user_cheight = v_height
+    self.user_cwidth = width
+    self.user_cheight = height
     self.user_cfps = fps
-    self.user_cexposure = v_exposure
+    self.user_cexposure = exposure
+    self.user_csaturation = saturation
     self.cam_width = None
     self.cam_height = None
     self.cam_fps = None
     self.cam_exposure = None
+    self.cam_saturation = None
     
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
     # frame rate for video playback
-    self.videoFPS = 15 if videoFPS is None else VideoFPS   
+    self.videoFPS = 15 if videoFPS is None else videoFPS   
   
     self.vStream = None # no open video stream yet
   
@@ -74,7 +77,13 @@ class videoSource(object):
     if self.vStream is None or (
        self.vStream is not None and not self.vStream.isOpened()):
       if self.useCam:
-        self.vStream = cv.VideoCapture(self.vdev_id)
+        if sys.platform[:5]=='linux': # v4l2 interface with fast MJPG codec
+           self.vStream = cv.VideoCapture(self.vdev_id, cv.CAP_V4L2)
+           rc = self.vStream.set(cv.CAP_PROP_FOURCC,
+                                 cv.VideoWriter_fourcc(*'MJPG') )
+        else:
+           self.vStream = cv.VideoCapture(self.vdev_id)
+
         if self.user_cwidth is not None:
           #print("setting cam width: ", self.user_width)
           self.vStream.set(cv.CAP_PROP_FRAME_WIDTH,
@@ -92,27 +101,26 @@ class videoSource(object):
           self.vStream.set(cv.CAP_PROP_AUTO_EXPOSURE, 1) # auto-exposure off
           self.vStream.set(cv.CAP_PROP_EXPOSURE,
                            self.user_cexposure)
-     # !!! test !!! improve color contrasts
-     #      these settings depend strongly on camera model !
-        #if self.useMJPG:
-        #codec = cv.VideoWriter_fourcc(*'MJPG') 
-        ### codec = 0x47504A4D
-        #self.vStream.set(cv.CAP_PROP_FOURCC, codec) 
-        #print("  set codec ", self.vStream.get(cv.CAP_PROP_FOURCC) ) 
-     # sat = 100 # normal is 64
-     # self.vStream.set(cv.CAP_PROP_SATURATION, sat)
-     # print("sat  {}  ({})".format(self.vStream.get(cv.CAP_PROP_SATURATION),sat))
+        if self.user_csaturation is not None:
+          self.vStream.set(cv.CAP_PROP_SATURATION, sat)
           
      # check settings (camera may use settings only close to the desired ones)
         self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
         self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.cam_fps=self.vStream.get(cv.CAP_PROP_FPS)
-        print("setting camera - width: {} ({}) ".format(self.cam_width, self.user_cwidth),
+        self.cam_exposure=self.vStream.get(cv.CAP_PROP_EXPOSURE)
+        self.cam_saturation = self.vStream.get(cv.CAP_PROP_EXPOSURE)
+        print("setting camera - ",
+              " width: {} ({}) ".format(self.cam_width, self.user_cwidth),
               " height: {} ({})".format(self.cam_height, self.user_cheight),
               " fps: {} ({})".format(self.cam_fps, self.user_cfps) )
-        if (self.user_cexposure):
-          self.cam_exposure=self.vStream.get(cv.CAP_PROP_EXPOSURE)
-          print("                 exposure: {} ({}) ".format(self.cam_exposure, self.user_cexposure))
+        if self.user_cexposure:
+          print("                 exposure: {} ({}) ".format(
+            self.cam_exposure, self.user_cexposure))
+        if self.user_csaturation:
+          print("                 saturation: {} ({})".format(
+            self.cam_saturation, self.user_csaturation))
+        #  
         print()
         
       else:
@@ -597,12 +605,13 @@ class ppBilliard(object):
 
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
     # default frame rate for replay of video files
-    videoFPS = None if 'defaultVideFPS' not in cD else cD['defaultVideoFPS']
+    videoFPS = None if 'defaultVideoFPS' not in cD else cD['defaultVideoFPS']
     # parameters of web-cam
     v_width = None if 'camWidth' not in cD else cD['camWidth']
     v_height = None if 'camHeight' not in cD else cD['camHeight']
     fps = None if 'camFPS' not in cD else cD['camFPS']
     exposure = None if 'camExposure' not in cD else cD['camExposure']
+    saturation = None if 'camSaturation' not in cD else cD['camSaturation']
 
     # size of trackable objects
     self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
@@ -670,7 +679,7 @@ class ppBilliard(object):
     #
     # set-up class managing video source
     self.vSource=videoSource(vdev_id,
-                             v_width, v_height, fps, exposure,
+                             v_width, v_height, fps, exposure, saturation,
                              videoFile, videoFPS)
     self.videoFile = self.vSource.videoFile
     #
