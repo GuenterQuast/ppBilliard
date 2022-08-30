@@ -23,7 +23,7 @@ class videoSource(object):
   """Set up video stream"""
   
   def __init__(self, vdev_id=0,
-               v_width=None, v_height=None, fps=None,
+               v_width=None, v_height=None, fps=None, v_exposure=None, 
                videoFile=None, videoFPS=None):
     """set parameters of video device"""
     # store iinput options
@@ -31,9 +31,11 @@ class videoSource(object):
     self.user_cwidth = v_width
     self.user_cheight = v_height
     self.user_cfps = fps
+    self.user_cexposure = v_exposure
     self.cam_width = None
     self.cam_height = None
     self.cam_fps = None
+    self.cam_exposure = None
     
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
@@ -82,28 +84,36 @@ class videoSource(object):
           self.vStream.set(cv.CAP_PROP_FRAME_HEIGHT,
                            self.user_cheight)
         if self.user_cfps is not None:
-          #print("setting cam fps: ", self.cam_fps)
+          #print("setting cam fps: ", self.user_fps)
           self.vStream.set(cv.CAP_PROP_FPS, self.user_cfps)
-
+        if self.user_cexposure is not None:
+          #print("setting cam exposure: ", self.user_cexposure)
+          self.vStream.set(cv.CAP_PROP_AUTO_EXPOSURE, 3) # auto-exposure on
+          self.vStream.set(cv.CAP_PROP_AUTO_EXPOSURE, 1) # auto-exposure off
+          self.vStream.set(cv.CAP_PROP_EXPOSURE,
+                           self.user_cexposure)
      # !!! test !!! improve color contrasts
      #      these settings depend strongly on camera model !
-     #   hue = -20 # normal is 0
-     #   self.vStream.set(cv.CAP_PROP_HUE, hue)
-     #   print("hue  {}  ({})".format(self.vStream.get(cv.CAP_PROP_HUE),hue))
-     #   sat = 100 # normal is 64
-     #   self.vStream.set(cv.CAP_PROP_SATURATION, sat)
-     #   print("sat  {}  ({})".format(self.vStream.get(cv.CAP_PROP_SATURATION),sat))
-     #   exp = 20
-     #   self.vStream.set(cv.CAP_PROP_EXPOSURE, exp)
-     #   print("exp  {}  ({})".format(self.vStream.get(cv.CAP_PROP_EXPOSURE),exp))
+        #if self.useMJPG:
+        #codec = cv.VideoWriter_fourcc(*'MJPG') 
+        ### codec = 0x47504A4D
+        #self.vStream.set(cv.CAP_PROP_FOURCC, codec) 
+        #print("  set codec ", self.vStream.get(cv.CAP_PROP_FOURCC) ) 
+     # sat = 100 # normal is 64
+     # self.vStream.set(cv.CAP_PROP_SATURATION, sat)
+     # print("sat  {}  ({})".format(self.vStream.get(cv.CAP_PROP_SATURATION),sat))
           
      # check settings (camera may use settings only close to the desired ones)
         self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
         self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.cam_fps=self.vStream.get(cv.CAP_PROP_FPS)
-        print("setting camera - width {} ({}): ".format(self.cam_width, self.user_cwidth),
-              " height {} ({}):".format(self.cam_height, self.user_cheight),
-              " fps {} ({}):\n".format(self.cam_fps, self.user_cfps) )
+        print("setting camera - width: {} ({}) ".format(self.cam_width, self.user_cwidth),
+              " height: {} ({})".format(self.cam_height, self.user_cheight),
+              " fps: {} ({})".format(self.cam_fps, self.user_cfps) )
+        if (self.user_cexposure):
+          self.cam_exposure=self.vStream.get(cv.CAP_PROP_EXPOSURE)
+          print("                 exposure: {} ({}) ".format(self.cam_exposure, self.user_cexposure))
+        print()
         
       else:
         # otherwise, grab a reference to the video file
@@ -592,6 +602,8 @@ class ppBilliard(object):
     v_width = None if 'camWidth' not in cD else cD['camWidth']
     v_height = None if 'camHeight' not in cD else cD['camHeight']
     fps = None if 'camFPS' not in cD else cD['camFPS']
+    exposure = None if 'camExposure' not in cD else cD['camExposure']
+
     # size of trackable objects
     self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
     self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
@@ -658,7 +670,7 @@ class ppBilliard(object):
     #
     # set-up class managing video source
     self.vSource=videoSource(vdev_id,
-                             v_width, v_height, fps,
+                             v_width, v_height, fps, exposure,
                              videoFile, videoFPS)
     self.videoFile = self.vSource.videoFile
     #

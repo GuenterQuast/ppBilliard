@@ -1,12 +1,10 @@
-## configuration parameters for p(roton)p(roton)Billiard
-
-# video files
-defaultVideoFPS: 15     # frame rate for replay of video files 
+## configuration parameters for *p(roton)p(roton)Billiard*
 
 # web cam parameters
-camWidth:  800
-camHeight: 600
+camWidth:  1000
+camHeight: 800
 camFPS:    30
+camExposure: null
 
 # properties of trackable objects
 objRmin:  15       # minimum radius in pixels
@@ -21,11 +19,13 @@ fTarget:     0.11  # target region around centre of image
 # processing
 maxVideoWidth: 1024     # maximum widht of video frames for processing
 
-# images:
+# images in subrirectory images/ for background and intro
 bkgImage: 'RhoZ_black.png'
 introImage: 'ppBilliard_intro.png'
 
 # running options 
 playIntro: true  # show trailer if true
 
+# video files
+defaultVideoFPS: 15     # frame rate for replay of video files 
 
