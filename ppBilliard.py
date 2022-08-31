@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Project ppBilliard
 
-   - Tracking of two round shapes in a webcam stream 
+   - Trackingbof two round shapes in a webcam stream 
    - replace  them by symbolic representation of a proton 
      (with quarks and gluons inside)
    - evaluate the kinematics of colliding objects, equivalent to 
@@ -108,23 +108,30 @@ class videoSource(object):
         if self.user_csaturation is not None:
           self.vStream.set(cv.CAP_PROP_SATURATION, sat)
           
-     # check settings (camera may use settings only close to the desired ones)
+     # read settings (camera may use settings only close to the desired ones)
         self.cam_width=self.vStream.get(cv.CAP_PROP_FRAME_WIDTH)  
         self.cam_height=self.vStream.get(cv.CAP_PROP_FRAME_HEIGHT)
         self.cam_fps=self.vStream.get(cv.CAP_PROP_FPS)
         self.cam_exposure=self.vStream.get(cv.CAP_PROP_EXPOSURE)
         self.cam_saturation = self.vStream.get(cv.CAP_PROP_EXPOSURE)
-        print("setting camera - ",
-              " width: {} ({}) ".format(self.cam_width, self.user_cwidth),
-              " height: {} ({})".format(self.cam_height, self.user_cheight),
-              " fps: {} ({})".format(self.cam_fps, self.user_cfps) )
-        if self.user_cexposure:
-          print("                 exposure: {} ({}) ".format(
-            self.cam_exposure, self.user_cexposure))
-        if self.user_csaturation:
-          print("                 saturation: {} ({})".format(
-            self.cam_saturation, self.user_csaturation))
-        #  
+        self.cam_brightness = self.vStream.get(cv.CAP_PROP_BRIGHTNESS)
+        self.cam_contrast = self.vStream.get(cv.CAP_PROP_CONTRAST)
+        self.cam_hue = self.vStream.get(cv.CAP_PROP_HUE)
+        
+        print("camera settings - ",
+              "width: {} ({}) ".format(self.cam_width, self.user_cwidth),
+              "height: {} ({})".format(self.cam_height, self.user_cheight),
+              "fps: {} ({})".format(self.cam_fps, self.user_cfps),
+              "\n"+"  user requests   ",
+              "exposure: {} ({}) ".format(self.cam_exposure,
+                                           self.user_cexposure),
+              "saturation: {} ({})".format( self.cam_saturation,
+                                            self.user_csaturation),
+              "\n"+"       in ()      ",
+              "brightness: {} ".format(self.cam_brightness),
+              "contrast: {} ".format(self.cam_contrast),
+              "hue: {} ".format(self.cam_hue) )
+
         print()
         
       else:
