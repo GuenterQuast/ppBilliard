@@ -253,6 +253,19 @@ def smoothImage(frame, ksize=11):
   blurred = cv.GaussianBlur(frame, (ksize, ksize), 0)
   return cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
 
+def detectMotion(frame, prev_frame):
+  '''Difference betreen to frames to detect motion
+
+    Returns binary mask of moving parts
+  '''  
+  dF = cv.absdiff(
+            src1=cv.cvtColor(frame, cv.COLOR_BGR2GRAY),
+            src2=cv.cvtColor(prev_frame,cv.COLOR_BGR2GRAY))
+  dF = cv.erode(dF, None, iterations=2)
+  dF = cv.dilate(dF, None, iterations=2)
+  return cv.threshold(src = dF, thresh=20,
+                       maxval=255, type=cv.THRESH_BINARY)[1]
+
 def findcircularObject_byColor(hsv_image,
                                colLower, colUpper,
                                rmin, rmax, algo = "Contours"):  
@@ -285,7 +298,7 @@ def findcircularObject_byColor(hsv_image,
         if c[2]>r:
           r = c[2]
           xy =(c[0],c[1])
-    return xy, r
+    return mask, xy, r
 
   # standard Algorithm:
   #   find contours in the mask and (x, y) of center
@@ -304,7 +317,7 @@ def findcircularObject_byColor(hsv_image,
         xy = (int(_x), int(_y))
       #M = cv.moments(c)
       #center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-  return xy, r
+  return mask, xy, r
 
 def plotTrace(frame, points, lw=3, color=(100,100,100)):
   """Draw list of points where object was found (an object trace)
@@ -614,9 +627,14 @@ class ppBilliard(object):
     #   take values from configuration dictionary if not None
     cD = confDict if confDict is not None else {}
 
+    # options 
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
+    self.showMonitoring = False if 'showMonitoring' in cD else cD['showMonitoring']
+    self.useMotionDetection = True if 'motionDetection' in cD else cd['motionDetection']
+
     # default frame rate for replay of video files
     videoFPS = None if 'defaultVideoFPS' not in cD else cD['defaultVideoFPS']
+
     # parameters of web-cam
     v_width = None if 'camWidth' not in cD else cD['camWidth']
     v_height = None if 'camHeight' not in cD else cD['camHeight']
@@ -624,20 +642,24 @@ class ppBilliard(object):
     exposure = None if 'camExposure' not in cD else cD['camExposure']
     saturation = None if 'camSaturation' not in cD else cD['camSaturation']
 
+    # fraction of image area used for ojcet tracking
+    self.fxROI = 1.0 if 'fxROI' not in cD else cD['fxROI']
+    self.fyROI = 1.0 if 'fyROI' not in cD else cD['fyROI']
     # size of trackable objects
     self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
     self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
     # scale factor for size of collision region relative to sum of object radii 
     self.fRcollision = 1.9 if 'fRcollsion' not in cD else cD['fRcollision']
     # fractional size of target region
-    self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']
+    self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']    
     # default colors of trackable objects (default green and red objcts)
     self.obj_col1 = [np.array([22,0,58], dtype=np.int16),
                      np.array([51,255,210], dtype=np.int16)] if\
       'obj_col1' not in cD else np.array(cD['obj_col1'], dtype=np.int16)
     self.obj_col2 = [np.array([0,90,60], dtype=np.int16),
                      np.array([25,250,255], dtype=np.int16)] if\
-      'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)    
+      'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)
+    
     # width of video (1024, or 800, 600 if CPU limits
     self.max_video_width = 1024 if 'maxVideoWidth' not in cD else \
                            cD['maxVideoWidth']
@@ -992,6 +1014,9 @@ class ppBilliard(object):
 
     """
 
+    # no old frame stored (for motion detection)
+    lastFrame =None  
+
     # skip some frames after re-start in order to remove old ones
     nskip = 0 if self.first else 3
     self.first = False
@@ -1040,6 +1065,17 @@ class ppBilliard(object):
         xtar_mx = int( (0.5+sf) * self.swidth)
         ytar_mn = int( (0.5-sf) * self.sheight)
         ytar_mx = int( (0.5+sf) * self.sheight)
+
+        # tracking region of interest
+        xroi_mn = int( (0.5-self.fxROI/2) * self.swidth)
+        xroi_mx = int( (0.5+self.fxROI/2) * self.swidth)
+        yroi_mn = int( (0.5-self.fyROI/2) * self.sheight)
+        yroi_mx = int( (0.5+self.fyROI/2) * self.sheight)
+        roi_mask = np.zeros( (h,w), np.uint8)
+        roi_mask = cv.rectangle(roi_mask,
+              (xroi_mn, yroi_mx),(xroi_mx, yroi_mn), 255, -1)        
+        msk = roi_mask
+        # <-- end actions first frame
         
       # resize frame (may save computation time)
       if self.scaleVideo:
@@ -1048,12 +1084,20 @@ class ppBilliard(object):
       if self.playIntro:       
          self.showIntro(frame)
          self.playIntro = False
-        
-      # smooth and convert to HSV color space
-      hsvImg = smoothImage(frame)
 
+      if self.useMotionDetection:
+        # motion detetction
+        if lastFrame is not None:
+          msk = roi_mask.copy()   
+          msk &= detectMotion(frame, lastFrame)
+        lastFrame = frame.copy()
+        
+      # apply mask(s), then smooth and convert to HSV color           
+      hsvImg = smoothImage(
+              cv.bitwise_and(frame, frame, mask=msk))
+  
       # find objects in video frame
-      xy1, r1 = findcircularObject_byColor(hsvImg,
+      frame_obj1, xy1, r1 = findcircularObject_byColor(hsvImg,
                                 self.obj_col1[0], self.obj_col1[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
@@ -1063,7 +1107,7 @@ class ppBilliard(object):
         #cv.circle(frame, (int(xy1 [0]), int(xy1[1])), int(2),
         #       (0, 255, 255), 2)
 
-      xy2, r2 = findcircularObject_byColor(hsvImg,
+      frame_obj2, xy2, r2 = findcircularObject_byColor(hsvImg,
                                 self.obj_col2[0], self.obj_col2[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
@@ -1085,6 +1129,13 @@ class ppBilliard(object):
       plotTrace(frame, self.pts1, lw=2, color=self.obj_bgr1 )
       plotTrace(frame, self.pts2, lw=2, color=self.obj_bgr2 )
   
+      # display Control graph(s)
+      if True:
+        mon_frame= cv.add(frame_obj1, frame_obj2)
+        plotTrace(mon_frame, self.pts1, lw=2, color=self.obj_bgr1 )
+        plotTrace(mon_frame, self.pts2, lw=2, color=self.obj_bgr2 )
+        cv.imshow("Monitor", mon_frame)
+
       # check for collisions of objects
       sawCollision = False
       l = len(self.pts1)
