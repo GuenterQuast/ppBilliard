@@ -1,36 +1,37 @@
 ## configuration parameters for *p(roton)p(roton)Billiard*
+#  -------------------------------------------------------
 
 # web cam parameters (acutal values depend on camera model)
-camWidth:  1280       # desired picture width
-camHeight:  720       # desired picture height
-camFPS:      30       # frame rate
-camExposure: null     # exposure time in ms
-camSaturation: null   # color saturation (depends on camera model)
+camWidth:  1280       # desired picture width  (null)
+camHeight:  720       # desired picture height (null)
+camFPS:      30       # frame rate             (null)
+camExposure: null     # exposure time in ms    (null)
+camSaturation: null   # color saturation, depends on camera model (null)
 
 # properties of trackable objects
-objRmin:  15       # minimum radius in pixels
-objRmax: 100       # maximum radius in pixels
+objRmin:  15       # minimum radius in pixels (15)
+objRmax: 100       # maximum radius in pixels (100)
 obj_col1 : [[23, 0, 50],[51, 255, 255]]  # hsv color range for green object
-obj_col2: [[0, 90, 50], [22, 255, 255]]  # hsv color range for red object
+obj_col2: [[0, 50, 50], [22, 255, 255]]  # hsv color range for red object
 
 # collision detection
-fRcollision: 1.9   # scaling of object size for collion detection
-fTarget:     0.11  # target region around centre of image
-fxROI:     0.7     # tracking region x as fraction of image width
-fyROI:     0.7     # tracking region y as fraction of image height
+fRcollision: 1.9   # scaling of object size for collion detection (1.5)
+fTarget:     0.11  # target region around centre of image (0.11)
+fxROI:  0.7        # tracking region x as fraction of image width  (1.0)
+fyROI:  0.7        # tracking region y as fraction of image height (1.0)
 
 # processing
-maxVideoWidth: 1024     # maximum widht of video frames for processing
+maxVideoWidth: 1024     # maximum widht of video frames for processing (1024)
 
 # images for intro and background (in subrirectory images/)
 introImage: 'ppBilliard_intro.png'
 bkgImage: 'RhoZ_black.png'
 
 # running options 
-playIntro: true  # show trailer if true
-motionDetection: true # differentiate frames to detect ball movements
-showMonitoring: false # show screen with detected objects
-
+playIntro: true  # show trailer if true (true)
+motionDetection: true # differentiate frames to detect ball movements (true)
+showMonitoring: true # show screen with detected objects (false)
+verbose: 1 # print detailed information if >0
 
 # video files
 defaultVideoFPS: 20     # frame rate for replay of video files 

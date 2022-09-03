@@ -629,9 +629,10 @@ class ppBilliard(object):
 
     # options 
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
-    self.showMonitoring = False if 'showMonitoring' in cD else cD['showMonitoring']
+    self.showMonitoring = False if 'showMonitoring' not in cD else cD['showMonitoring']
     self.useMotionDetection = True if 'motionDetection' in cD else cd['motionDetection']
-
+    self.verbose = 0 if 'verbose' not in cD else cD['verbose']
+    
     # default frame rate for replay of video files
     videoFPS = None if 'defaultVideoFPS' not in cD else cD['defaultVideoFPS']
 
@@ -649,7 +650,7 @@ class ppBilliard(object):
     self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
     self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
     # scale factor for size of collision region relative to sum of object radii 
-    self.fRcollision = 1.9 if 'fRcollsion' not in cD else cD['fRcollision']
+    self.fRcollision = 1.5 if 'fRcollision' not in cD else cD['fRcollision']
     # fractional size of target region
     self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']    
     # default colors of trackable objects (default green and red objcts)
@@ -694,8 +695,8 @@ class ppBilliard(object):
     self.obj_bgr1 = hsv2bgr((self.obj_col1[0]+self.obj_col1[1])//2)
     self.obj_bgr2 = hsv2bgr((self.obj_col2[0]+self.obj_col2[1])//2)
     
-    self.pts1 = deque(maxlen=args["buffer"]) # queue for object1 xy
-    self.pts2 = deque(maxlen=args["buffer"]) # queue for object2 xy
+    self.trk1 = deque(maxlen=args["buffer"]) # queue for object1 xy
+    self.trk2 = deque(maxlen=args["buffer"]) # queue for object2 xy
 
     # load background image to be overlayed on webcam frames
     try:
@@ -736,8 +737,8 @@ class ppBilliard(object):
     self.CollisionResult = None
     self.resultFrame = None
     #
-    self.pts1.clear() # queue for object1 xy
-    self.pts2.clear() # queue for object2 xy
+    self.trk1.clear() # queue for object1 xy
+    self.trk2.clear() # queue for object2 xy
     #
 
     # init video device and return video stream  
@@ -887,7 +888,26 @@ class ppBilliard(object):
     # cross-fade to camera image 
     frame = crossfade(self.WNam, frame, tmpimg)
 
-  
+  @staticmethod
+  def getKinematics(t):
+    '''Determine velocity from thre points along track t
+       
+      Input: 
+        t: list of 3 xy-coordinate
+
+      Returns:
+        r: space point
+        v: velocity
+    '''
+
+    d0 = t[1]-t[0]
+    d1 = t[2]-t[1]
+    norm =  max(1, np.sqrt(np.inner(d0,d0)*np.inner(d1,d1)))
+    if np.inner(d0,d1)/norm > 0.95:
+      return t[0] , (t[2]-t[0])/2.
+    else: # there is a "kink" in the trace, 
+      return t[1] , d1/1.
+    
   @staticmethod
   def extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2):
     """ caluclate extrapolated distance at collision 
@@ -1097,79 +1117,80 @@ class ppBilliard(object):
               cv.bitwise_and(frame, frame, mask=msk))
   
       # find objects in video frame
-      frame_obj1, xy1, r1 = findcircularObject_byColor(hsvImg,
+      frame_obj1, xy1, R1 = findcircularObject_byColor(hsvImg,
                                 self.obj_col1[0], self.obj_col1[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
-      if self.obj_max_radius >= r1 >= self.obj_min_radius:
+      if self.obj_max_radius >= R1 >= self.obj_min_radius:
         # draw "proton with three quarks and gluons
-        proton.draw(frame, xy1[0], xy1[1], r1)      
+        proton.draw(frame, xy1[0], xy1[1], R1)      
         #cv.circle(frame, (int(xy1 [0]), int(xy1[1])), int(2),
         #       (0, 255, 255), 2)
 
-      frame_obj2, xy2, r2 = findcircularObject_byColor(hsvImg,
+      frame_obj2, xy2, R2 = findcircularObject_byColor(hsvImg,
                                 self.obj_col2[0], self.obj_col2[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
-      if self.obj_max_radius >= r2 >= self.obj_min_radius:
+      if self.obj_max_radius >= R2 >= self.obj_min_radius:
         # draw "proton with three quarks and gluons
-        proton.draw(frame, xy2[0], xy2[1], r2)      
+        proton.draw(frame, xy2[0], xy2[1], R2)      
         #cv.circle(frame, (int(xy2[0]), int(xy2[1])), int(radius2),
         #        (0, 255, 255), 2)
 
       # update the tracked-points queue
-      self.pts1.appendleft(xy1)
-      self.pts2.appendleft(xy2)
+      self.trk1.appendleft(xy1)
+      self.trk2.appendleft(xy2)
 
       # add detector contours 
       if self.bkgimg is not None:
         frame = cv.addWeighted(frame, 0.65, self.bkgimg, 0.35, 0.)
 
       # plot object traces from list of tracked points    
-      plotTrace(frame, self.pts1, lw=2, color=self.obj_bgr1 )
-      plotTrace(frame, self.pts2, lw=2, color=self.obj_bgr2 )
+      plotTrace(frame, self.trk1, lw=2, color=self.obj_bgr1 )
+      plotTrace(frame, self.trk2, lw=2, color=self.obj_bgr2 )
   
       # display Control graph(s)
-      if True:
+      if self.showMonitoring:
         mon_frame= cv.add(frame_obj1, frame_obj2)
-        plotTrace(mon_frame, self.pts1, lw=2, color=self.obj_bgr1 )
-        plotTrace(mon_frame, self.pts2, lw=2, color=self.obj_bgr2 )
+        plotTrace(mon_frame, self.trk1, lw=2, color=self.obj_bgr1 )
+        plotTrace(mon_frame, self.trk2, lw=2, color=self.obj_bgr2 )
         cv.imshow("Monitor", mon_frame)
 
       # check for collisions of objects
       sawCollision = False
-      l = len(self.pts1)
-      if l>2 and \
-        self.pts1[0] is not None and self.pts2[0] is not None \
-        and self.pts1[2] is not None and self.pts2[2] is not None :
-        v_c1 = np.array(xy1)
-        v_c2 = np.array(xy2)
-        v_dist = v_c2 - v_c1        
-        dist = np.sqrt(np.inner(v_dist, v_dist))
-        # check for collsion in central region of playground
-        if (xtar_mn < v_c1[0] < xtar_mx) and (xtar_mn < v_c2[0] < xtar_mx) and\
-           (ytar_mn < v_c1[1] < ytar_mx) and (ytar_mn < v_c2[1] < ytar_mx) and\
-           (dist <  self.fRcollision * (r1+r2)):  # objects (nearly) touched
-          nf = 2
-          v_c10 = np.array(self.pts1[nf])
-          v_c20 = np.array(self.pts2[nf])
-          # get velocities
-          v_v1 = (v_c1 - v_c10)/nf
-          v_v2 = (v_c2 - v_c20)/nf
-          # extrapolate to collision point
-          self.v_c01, self.v_c02, self.impactDistance = \
-              self.extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2)
-          if self.impactDistance < (r1+r2):
-            sawCollision=True
-            # analyze full kinematics
-            self.analyzeCollision(v_c1, v_c2, v_v1, v_v2, r1+r2)
-            # draw Collision
-            dist = int(self.CollisionResult['iDistance'])
-            angle = int( self.CollisionResult['angle'])
-            v_C = self.CollisionResult['iCoordinates']
-            proton.drawCollision(frame, v_C, dist, angle)
-            self.resultFrame=frame.copy()
-            break
+      nf = 3 # number of valid frames for kinematics 
+      if len(self.trk1) >= nf:
+        trace1 = np.asarray([self.trk1[i] for i in range(nf)], dtype=object)
+        trace2 = np.asarray([self.trk2[i] for i in range(nf)], dtype=object)
+        if not (trace1 == None).any() and not (trace2 == None).any(): 
+          v_r1 = trace1[0]
+          v_r2 = trace2[0]
+          v_dist = v_r2 - v_r1        
+          dist = np.sqrt(np.inner(v_dist, v_dist))
+          # check for collsion in central region of playground
+          if (xtar_mn < v_r1[0] < xtar_mx) and (xtar_mn < v_r2[0] < xtar_mx) and\
+             (ytar_mn < v_r1[1] < ytar_mx) and (ytar_mn < v_r2[1] < ytar_mx) and\
+             (dist <  self.fRcollision * (R1+R2)):        # objects (nearly) touched
+            # get kinematics
+            v_r1, v_v1 = self.getKinematics(trace1)
+            v_r2, v_v2 = self.getKinematics(trace2)
+            # extrapolate to collision point
+            self.v_c01, self.v_c02, self.impactDistance = \
+              self.extrapolate2CollisionPoint(v_r1, v_r2, v_v1, v_v2)
+            if self.verbose:
+              print(" *==* close distance {:.1f}, radius1: {}, radius2: {}".format(dist, R1 ,R2))
+              print("    distance at impact: {:.1f}".format(self.impactDistance))
+            if self.impactDistance < 1.05*(R1+R2):
+              sawCollision=True
+              # analyze full kinematics
+              self.analyzeCollision(v_r1, v_r2, v_v1, v_v2, R1+R2)
+              # draw Collision
+              dist = int(self.CollisionResult['iDistance'])
+              angle = int( self.CollisionResult['angle'])
+              v_C = self.CollisionResult['iCoordinates']
+              proton.drawCollision(frame, v_C, dist, angle)
+              self.resultFrame=frame.copy()
+              break
 
       # put text on first frames
       if self.nframes < 20:
