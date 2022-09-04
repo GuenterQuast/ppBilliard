@@ -43,7 +43,7 @@ class videoSource(object):
     self.videoFile = videoFile
     self.useCam = True if videoFile is None else False
     # frame rate for video playback
-    self.videoFPS = 15 if videoFPS is None else videoFPS   
+    self.videoFPS = 15 if videoFPS is None else videoFPS
   
     self.vStream = None # no open video stream yet
   
@@ -142,14 +142,6 @@ class videoSource(object):
   def stop(self):
     self.vStream.release()
   
-class hsvRangeFinder(object):
-  """Support Class for video tracking of colored objects
-
-      - initialize webcam
-      - interactively find hsv-range of trackable object
-  """
-
-  # --- end class hsvRangeFinder
 
 class vMouse(object):
   """provides basic mouse functionality in video window
@@ -630,7 +622,7 @@ class ppBilliard(object):
     # options 
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
     self.showMonitoring = False if 'showMonitoring' not in cD else cD['showMonitoring']
-    self.useMotionDetection = True if 'motionDetection' in cD else cd['motionDetection']
+    self.useMotionDetection = False if 'motionDetection' not in cD else cD['motionDetection']
     self.verbose = 0 if 'verbose' not in cD else cD['verbose']
     
     # default frame rate for replay of video files
@@ -647,7 +639,7 @@ class ppBilliard(object):
     self.fxROI = 1.0 if 'fxROI' not in cD else cD['fxROI']
     self.fyROI = 1.0 if 'fyROI' not in cD else cD['fyROI']
     # size of trackable objects
-    self.obj_min_radius = 15 if 'objRmin' not in cD else cD['objRmin']
+    self.obj_min_radius = 10 if 'objRmin' not in cD else cD['objRmin']
     self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
     # scale factor for size of collision region relative to sum of object radii 
     self.fRcollision = 1.5 if 'fRcollision' not in cD else cD['fRcollision']
@@ -785,6 +777,7 @@ class ppBilliard(object):
 
     # wait time between frames for camera/video playback
     wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS)
+
     iFrame = 0
     while True:
       # Start reading video stream frame by frame.
@@ -890,7 +883,7 @@ class ppBilliard(object):
 
   @staticmethod
   def getKinematics(t):
-    '''Determine velocity from thre points along track t
+    '''Determine velocity from three points along track t
        
       Input: 
         t: list of 3 xy-coordinate
@@ -900,13 +893,19 @@ class ppBilliard(object):
         v: velocity
     '''
 
-    d0 = t[1]-t[0]
-    d1 = t[2]-t[1]
-    norm =  max(1, np.sqrt(np.inner(d0,d0)*np.inner(d1,d1)))
-    if np.inner(d0,d1)/norm > 0.95:
+    d0 = t[0]-t[1]
+    d1 = t[1]-t[2]
+    # calculate square of cosine of angle between track segments
+    d0d1 = np.inner(d0,d1)
+    cost2 = d0d1*d0d1 / max(1, np.inner(d0,d0)*np.inner(d1,d1) ) 
+    # accept if < 8 deg
+    if cost2 > 0.97:
       return t[0] , (t[2]-t[0])/2.
-    else: # there is a "kink" in the trace, 
-      return t[1] , d1/1.
+    else: # there is a "kink" in the trace,
+      if len(t) > 3:
+        return t[1] , (t[3]-t[1])/2.
+      else:    
+        return t[1] , d1/1.
     
   @staticmethod
   def extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2):
@@ -1041,18 +1040,21 @@ class ppBilliard(object):
     nskip = 0 if self.first else 3
     self.first = False
     
+    # wait time between frames for camera/video playback
+    tFrame = 1./self.vSource.videoFPS # time for one Frame
+    wait_time = 1 
+    
     # initialize frame rate counter
     rate = frameRate()
-    
-    # wait time between frames for camera/video playback
-    wait_time = 1 if self.vSource.useCam else int(1000./self.vSource.videoFPS) 
     
     # --- start loop over video frames 
     while self.vs.isOpened():
       # grab current frame
       ret, frame= self.vs.read()
+      # timing
       self.framerate = rate.timeit()
-      
+      t_start = time.time()      
+
       # end of video file reached ?
       if frame is None:
         print ('None recieved from video stream - ending!')
@@ -1106,10 +1108,11 @@ class ppBilliard(object):
          self.playIntro = False
 
       if self.useMotionDetection:
-        # motion detetction
         if lastFrame is not None:
+         # motion detetction, generate mask of moving objects
           msk = roi_mask.copy()   
           msk &= detectMotion(frame, lastFrame)
+        #save current fraeme
         lastFrame = frame.copy()
         
       # apply mask(s), then smooth and convert to HSV color           
@@ -1154,11 +1157,11 @@ class ppBilliard(object):
         mon_frame= cv.add(frame_obj1, frame_obj2)
         plotTrace(mon_frame, self.trk1, lw=2, color=self.obj_bgr1 )
         plotTrace(mon_frame, self.trk2, lw=2, color=self.obj_bgr2 )
-        cv.imshow("Monitor", mon_frame)
+        cv.imshow("Monitor", cv.resize(mon_frame, None, fx=0.4, fy=0.4))
 
       # check for collisions of objects
       sawCollision = False
-      nf = 3 # number of valid frames for kinematics 
+      nf = 4 # number of valid frames for kinematics 
       if len(self.trk1) >= nf:
         trace1 = np.asarray([self.trk1[i] for i in range(nf)], dtype=object)
         trace2 = np.asarray([self.trk2[i] for i in range(nf)], dtype=object)
@@ -1209,6 +1212,9 @@ class ppBilliard(object):
         # pause
           cv.waitKey(-1) # wait until any key pressed
 
+      # extra wait if source is video 
+      if not self.vSource.useCam:
+        time.sleep( max(tFrame-time.time()+t_start, 0) )
           
     return self.CollisionResult
     # <-- end of loop
@@ -1276,7 +1282,7 @@ def run_Calibration(ppBilliard_instance):
   # (re-)initialize video stream
   ppBilliard_instance.init()
 
-  hsv_dict=ppBilliard_instance.runCalibration()
+  hsv_dict = ppBilliard_instance.runCalibration()
 
   if hsv_dict is not None:
     fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
