@@ -513,58 +513,70 @@ class proton(object):
       _ = blur_circular_region(frame, (x, y), r, ksize=max(2, r//4))  
 
   @classmethod
-  def drawCollision(c, frame, v_C, dist, angle):
-    """plot proton-proton collision:
+  def drawCollision(c, win, frame, v_C, dist, angle):
+    """plot (symbolic) proton-proton collision
       
        input:
+         - opencv window
+         - actual frame to overlay collistoin
          - vector to center of collision (int, in pixels)
          - distance vector between protons (int, in pixels)
+         - angle for orientation of ellipse
     """
+    
     h, w = frame.shape[:2]
     # distance between collisions
     R = max(w//30, (2*dist)//3)
     x = v_C[0]
     y = v_C[1]
+    # random direction for "scattered" quaks
     sign= 1 if random.random()>0.5 else -1
     x1 = int(x+R/2)
     y1 = int(y-sign*R/2)
     x2 = int(x-R/2)
     y2 = int(y+sign*R/2)
 
-    rq = int(R/5) # radius of a circle for quark
-
-    # draw an ellipse
-    a = (3*R)//2
-    b = R
-    cv.ellipse(frame, v_C, (a,b),
+    def _plot(_R):
+      # helper function for plotting 
+      rq = int(_R//5)          # radius of a circle for quark
+      # draw an ellipse
+      a = (3*_R)//2
+      b = _R
+      cv.ellipse(frame, v_C, (a,b),
                angle, 0, 360,
                c.ccolor, -1)
+      # put proton remnants inside
+      c.draw(frame, x+_R//5, y, 3*_R//4, nobkg=True) 
+      c.draw(frame, x-_R//5, y, 3*_R//4, nobkg=True)
+      # some scattered quarks
+      cq = c.cquark
+      random.shuffle(cq)
+      if not c.showQuarkCharges: 
+      # d ... as circles
+        cv.circle(frame, (x1, y1), rq, cq[0], -1)
+        cv.circle(frame, (x2, y2), rq, cq[1], -1)
+      else:
+        # ... as triangles (up or down) with randomized quark charge
+        drawQ = [c.triangleUp, c.triangleUp, c.triangleDown]
+        random.shuffle(drawQ)
+        cnt1 = drawQ[0](rq, (x1,y1)) 
+        cnt2 = drawQ[1](rq, (x2,y2)) 
+        cv.drawContours(frame, [cnt1], 0, cq[0], -1)
+        cv.drawContours(frame, [cnt2], 0, cq[1], -1)
+      # add a gluon  
+      cv.line(frame, (x1,y1), (x2,y2), c.cglue, thickness = 5)
+      if c.blur:
+        _ = blur_elliptical_region(frame, v_C, (a,b), angle, ksize=max(2, R//4))
+    # <-- end _plot()
 
-    # put proton remnants inside
-    c.draw(frame, x+R//5, y, 3*R//4, nobkg=True) 
-    c.draw(frame, x-R//5, y, 3*R//4, nobkg=True)
+    # plot elliptical regions of increasing size (with "quarks" inside)
+    nf = 5
+    for i in range(nf): 
+      Ri = R//2 + R//(nf-i)    # increasing radius
+      _plot(Ri)
+      cv.imshow(win, frame)
+      key = cv.waitKey(25)
 
-    # some scattered quarks
-    cq = c.cquark
-    random.shuffle(cq)
-    if not c.showQuarkCharges: 
-    # d ... as circles
-      cv.circle(frame, (x1, y1), rq, cq[0], -1)
-      cv.circle(frame, (x2, y2), rq, cq[1], -1)
-    else:
-      # ... as triangles (up or down) with randomized quark charge
-      drawQ = [c.triangleUp, c.triangleUp, c.triangleDown]
-      random.shuffle(drawQ)
-      cnt1 = drawQ[0](rq, (x1,y1)) 
-      cnt2 = drawQ[1](rq, (x2,y2)) 
-      cv.drawContours(frame, [cnt1], 0, cq[0], -1)
-      cv.drawContours(frame, [cnt2], 0, cq[1], -1)
-    # add a gluon  
-    cv.line(frame, (x1,y1), (x2,y2), c.cglue, thickness = 5)
-
-    if c.blur:
-      _ = blur_elliptical_region(frame, v_C, (a,b), angle, ksize=max(2, R//4))
-      
 def bgr2hsv( bgr):
   # convert Blue-Green-Red to Hue-Saturation-Value
   c = np.uint8([[bgr]])
@@ -894,8 +906,9 @@ class ppBilliard(object):
     # <-- end proton animation
 
     # draw collision symbol 
-    proton.drawCollision(tmpimg, (w//2, h//2), 2*r, 0.)
-    cv.imshow(self.WNam, tmpimg)
+    proton.drawCollision(self.WNam, tmpimg, (w//2, h//2), 2*r, 0.)
+#    cv.imshow(self.WNam, tmpimg)
+#      key = cv.waitKey(wait_time) & 0xFF
 
     # cross-fade to camera image 
     frame = crossfade(self.WNam, frame, tmpimg)
@@ -1234,7 +1247,7 @@ class ppBilliard(object):
               dist = int(self.CollisionResult['iDistance'])
               angle = int( self.CollisionResult['angle'])
               v_C = self.CollisionResult['iCoordinates']
-              proton.drawCollision(frame, v_C, dist, angle)
+              proton.drawCollision(self.WNam, frame, v_C, dist, angle)
               self.resultFrame=frame.copy()
               break
 
