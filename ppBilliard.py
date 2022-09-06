@@ -245,18 +245,30 @@ def smoothImage(frame, ksize=11):
   blurred = cv.GaussianBlur(frame, (ksize, ksize), 0)
   return cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
 
-def detectMotion(frame, prev_frame):
-  '''Difference betreen to frames to detect motion
-
-    Returns binary mask of moving parts
-  '''  
-  dF = cv.absdiff(
-            src1=cv.cvtColor(frame, cv.COLOR_BGR2GRAY),
-            src2=cv.cvtColor(prev_frame,cv.COLOR_BGR2GRAY))
+def detectMotion(frame, prev_frame, rmin, rmax):
+  '''Difference betreen to frames to detect appearing object in frame
+    
+    input frames as grey scale images
+    Returns binary mask of moving parts of image
+  '''
+  h0, w0 = frame.shape[:2]
+  dF = cv.subtract(src1=frame, src2=prev_frame)
   dF = cv.erode(dF, None, iterations=2)
   dF = cv.dilate(dF, None, iterations=2)
-  return cv.threshold(src = dF, thresh=20,
-                       maxval=255, type=cv.THRESH_BINARY)[1]
+  dF = cv.threshold(src = dF, thresh=20, maxval=255, type=cv.THRESH_BINARY)[1]
+  cnts, _objs = cv.findContours(dF, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+  # find maximum bounding rectangle (assuming symmetric object)
+  Ncnt = 0
+  for c in cnts:
+    x, y, w, h = cv.boundingRect(c)
+    if rmax >= max(w, h) >= rmin:
+      Ncnt += 1
+      d = abs(w-h) 
+      dw = 0 if w>h else d
+      dh = 0 if h>w else d
+      cv.rectangle(dF, (max(0, x-dw), max(0, y-dh) ),
+                     (min(x+w+dw, w0-1), min(y+h+dh, h0-1) ), 255,-1)
+  return Ncnt, dF
 
 def findcircularObject_byColor(hsv_image,
                                colLower, colUpper,
@@ -270,7 +282,6 @@ def findcircularObject_byColor(hsv_image,
     - cv2.HoughCirles
     - cv2.FindContours
   """
-
 
   mask = cv.inRange(hsv_image, colLower, colUpper)
   mask = cv.erode(mask, None, iterations=2)
@@ -294,7 +305,7 @@ def findcircularObject_byColor(hsv_image,
 
   # standard Algorithm:
   #   find contours in the mask and (x, y) of center
-  cnts, _obj2 = cv.findContours(mask.copy(), cv.RETR_EXTERNAL,
+  cnts, _objs = cv.findContours(mask, cv.RETR_EXTERNAL,
          cv.CHAIN_APPROX_SIMPLE)
   xy , r = None,  0
   # only proceed if at least one contour was found
@@ -337,10 +348,10 @@ def blur_region(frame, xy, wxy, ksize=7):
   wym=wy if wy < 0 else 0
   
   h, w = frame.shape[:2]
-  roi = frame[ max(0, y+wym) : min(h, y+abs(wy)),
-               max(0, x+wxm) : min(w, x+abs(wx)) ]
-  frame[max(0, y+wym) : min(h, y+abs(wy)),
-        max(0, x+wxm) : min(w, x+abs(wx))] = \
+  roi = frame[ max(0, y+wym) : min(h-1, y+abs(wy)),
+               max(0, x+wxm) : min(w-1, x+abs(wx)) ]
+  frame[max(0, y+wym) : min(h-1, y+abs(wy)),
+        max(0, x+wxm) : min(w-1, x+abs(wx))] = \
     cv.blur(roi, (ksize, ksize))
   return frame      
 
@@ -355,8 +366,8 @@ def blur_circular_region(frame, xy, r, ksize=7):
   
   # extract region of interest (roi) from image
   h, w = frame.shape[:2]
-  roi = frame[ max(0, y-r) : min(h, y+r),
-               max(0, x-r) : min(w, x+r) ]
+  roi = frame[ max(0, y-r) : min(h-1, y+r),
+               max(0, x-r) : min(w-1, x+r) ]
  # create masks with (white on black and black on white) circles 
   roi_shape = ( roi.shape[0], roi.shape[1], 1 )
   mask_circ = np.full( roi_shape, 0, dtype=np.uint8)
@@ -367,7 +378,7 @@ def blur_circular_region(frame, xy, r, ksize=7):
     tmpImg = roi.copy()
     tmpImg = cv.blur(tmpImg, (ksize, ksize))
    # copy blurred circle and background to its position in image
-    frame[max(0, y-r) : min(h, y+r), max(0, x-r) : min(w, x+r)] = \
+    frame[max(0, y-r) : min(h-1, y+r), max(0, x-r) : min(w-1, x+r)] = \
       cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_circ),
               cv.bitwise_and(roi, roi, mask = invmask_circ) )
   return frame
@@ -385,8 +396,8 @@ def blur_elliptical_region(frame, xy, ab, angle, ksize=7):
  # extract region of interest (roi) from image
   h, w = frame.shape[:2]
   w0 = max(a,b)
-  roi = frame[ max(0, y-w0) : min(h, y+w0),
-               max(0, x-w0) : min(w, x+w0) ]
+  roi = frame[ max(0, y-w0) : min(h-1, y+w0),
+               max(0, x-w0) : min(w-1, x+w0) ]
  # create masks with (white on black and black on white) ellipses
   roi_shape = ( roi.shape[0], roi.shape[1], 1 )
   mask_ellipse = np.full( roi_shape, 0, dtype=np.uint8)
@@ -398,7 +409,7 @@ def blur_elliptical_region(frame, xy, ab, angle, ksize=7):
     tmpImg = roi.copy()
     tmpImg = cv.blur(tmpImg, (ksize, ksize))
    # copy blurred circle and background to its position in image
-    frame[max(0, y-w0) : min(h, y+w0), max(0, x-w0) : min(w, x+w0)] = \
+    frame[max(0, y-w0) : min(h-1, y+w0), max(0, x-w0) : min(w-1, x+w0)] = \
       cv.add( cv.bitwise_and(tmpImg, tmpImg, mask = mask_ellipse),
               cv.bitwise_and(roi, roi, mask = invmask_ellipse) )
   return frame
@@ -635,7 +646,7 @@ class ppBilliard(object):
     exposure = None if 'camExposure' not in cD else cD['camExposure']
     saturation = None if 'camSaturation' not in cD else cD['camSaturation']
 
-    # fraction of image area used for ojcet tracking
+    # fraction of image area used for objcet tracking
     self.fxROI = 1.0 if 'fxROI' not in cD else cD['fxROI']
     self.fyROI = 1.0 if 'fyROI' not in cD else cD['fyROI']
     # size of trackable objects
@@ -695,10 +706,18 @@ class ppBilliard(object):
       self.bkgimg = cv.imread('images/'+ self.bkgImageName, cv.IMREAD_COLOR)
       h, w = self.bkgimg.shape[:2]
       sf = np.sqrt(self.fTarget)/2.
+      # draw target region 
       cv.rectangle( self.bkgimg,
                     ( int( (0.5-sf)*w), int( (0.5+sf)*h) ),
                     ( int( (0.5+sf)*w), int( (0.5-sf)*h) ),
                     (20,255,45), 3)
+      # draw active region (=roi)
+      sx = self.fxROI/2
+      sy = self.fyROI/2
+      cv.rectangle( self.bkgimg,
+                    ( int( (0.5-sx)*w), int( (0.5+sy)*h) ),
+                    ( int( (0.5+sx)*w), int( (0.5-sy)*h) ),
+                    (100,100,100), 3)      
     except:
       self.bkgimg = None
       print("* ppBilliard.init: no background image found !")    
@@ -851,12 +870,12 @@ class ppBilliard(object):
       x1 = r +  (i * (w-r))//2 // nf
       x2 = w - r -  (i * (w-r))//2 // nf
       # save background, then draw proton
-      roi1 = tmpimg[ max(0, y-r-1) : min(h, y+r+1),
-                 max(0, x1-r-1) : min(w, x1+r+1) ].copy()
+      roi1 = tmpimg[ max(0, y-r-1) : min(h-1, y+r+1),
+                 max(0, x1-r-1) : min(w-1, x1+r+1) ].copy()
       proton.draw(tmpimg, x1, y, r)
       # save background, then draw proton2 
-      roi2 = tmpimg[ max(0, y-r-1) : min(h, y+r+1),
-                 max(0, x2-r-1) : min(w, x2+r+1) ].copy()
+      roi2 = tmpimg[ max(0, y-r-1) : min(h-1, y+r+1),
+                 max(0, x2-r-1) : min(w-1, x2+r+1) ].copy()
       proton.draw(tmpimg, x2, y, r)      
 # --- simpler version, but needs copy of full image each time in loop      
 #      tmp = img.copy() 
@@ -867,11 +886,11 @@ class ppBilliard(object):
       cv.waitKey(70) # wait until key pressed
       # write background (overwrite proton image)
       if roi1 is not None:
-        tmpimg[max(0, y-r-1) : min(h, y+r+1),
-               max(0, x1-r-1) : min(w, x1+r+1)] = roi1      
+        tmpimg[max(0, y-r-1) : min(h-1, y+r+1),
+               max(0, x1-r-1) : min(w-1, x1+r+1)] = roi1      
       if roi2 is not None:
-        tmpimg[max(0, y-r-1) : min(h, y+r+1),
-               max(0, x2-r-1) : min(w, x2+r+1)] = roi2      
+        tmpimg[max(0, y-r-1) : min(h-1, y+r+1),
+               max(0, x2-r-1) : min(w-1, x2+r+1)] = roi2      
     # <-- end proton animation
 
     # draw collision symbol 
@@ -1034,7 +1053,7 @@ class ppBilliard(object):
     """
 
     # no old frame stored (for motion detection)
-    lastFrame =None  
+    lastFrame = None  
 
     # skip some frames after re-start in order to remove old ones
     nskip = 0 if self.first else 3
@@ -1095,7 +1114,9 @@ class ppBilliard(object):
         yroi_mx = int( (0.5+self.fyROI/2) * self.sheight)
         roi_mask = np.zeros( (h,w), np.uint8)
         roi_mask = cv.rectangle(roi_mask,
-              (xroi_mn, yroi_mx),(xroi_mx, yroi_mn), 255, -1)        
+                      (xroi_mn, yroi_mx), (xroi_mx, yroi_mn), 255, -1)
+
+        mov_mask = None
         msk = roi_mask
         # <-- end actions first frame
         
@@ -1108,19 +1129,26 @@ class ppBilliard(object):
          self.playIntro = False
 
       if self.useMotionDetection:
+      # motion detetction, generate mask with objects
+      #   that appeared w.r.t laste frame
+        grey = cv.bitwise_and(cv.cvtColor(frame, cv.COLOR_BGR2GRAY), roi_mask)
         if lastFrame is not None:
-         # motion detetction, generate mask of moving objects
-          msk = roi_mask.copy()   
-          msk &= detectMotion(frame, lastFrame)
-        #save current fraeme
-        lastFrame = frame.copy()
-        
+          Ncnt, mov_mask = detectMotion(grey, lastFrame,
+                self.obj_min_radius, self.obj_max_radius )
+          if Ncnt > 1: 
+            msk = mov_mask
+          else:
+            msk = roi_mask
+        # save frame 
+        lastFrame = grey.copy()
+      else:
+        msk = roi_mask
+
       # apply mask(s), then smooth and convert to HSV color           
-      hsvImg = smoothImage(
-              cv.bitwise_and(frame, frame, mask=msk))
+      hsvImg = smoothImage(cv.bitwise_and(frame, frame, mask=msk))
   
       # find objects in video frame
-      frame_obj1, xy1, R1 = findcircularObject_byColor(hsvImg,
+      msk_obj1, xy1, R1 = findcircularObject_byColor(hsvImg,
                                 self.obj_col1[0], self.obj_col1[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
@@ -1130,7 +1158,7 @@ class ppBilliard(object):
         #cv.circle(frame, (int(xy1 [0]), int(xy1[1])), int(2),
         #       (0, 255, 255), 2)
 
-      frame_obj2, xy2, R2 = findcircularObject_byColor(hsvImg,
+      msk_obj2, xy2, R2 = findcircularObject_byColor(hsvImg,
                                 self.obj_col2[0], self.obj_col2[1],
                                 self.obj_min_radius, self.obj_max_radius)
       # only proceed if the radius fits
@@ -1152,12 +1180,27 @@ class ppBilliard(object):
       plotTrace(frame, self.trk1, lw=2, color=self.obj_bgr1 )
       plotTrace(frame, self.trk2, lw=2, color=self.obj_bgr2 )
   
-      # display Control graph(s)
+      # display monitoring graph(s) for mask
       if self.showMonitoring:
-        mon_frame= cv.add(frame_obj1, frame_obj2)
-        plotTrace(mon_frame, self.trk1, lw=2, color=self.obj_bgr1 )
-        plotTrace(mon_frame, self.trk2, lw=2, color=self.obj_bgr2 )
-        cv.imshow("Monitor", cv.resize(mon_frame, None, fx=0.4, fy=0.4))
+        msk_final = cv.add(msk_obj1, msk_obj2)
+        plotTrace(msk_final, self.trk1, lw=2, color=self.obj_bgr1 )
+        plotTrace(msk_final, self.trk2, lw=2, color=self.obj_bgr2 )
+        if self.useMotionDetection and mov_mask is not None:
+          img_mon = cv.hconcat([
+                                 cv.copyMakeBorder(mov_mask,
+                            10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99)),
+                                 cv.copyMakeBorder(msk_final,
+                            10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99))
+                                                   ])
+          h, w = img_mon.shape[:2]
+          cv.putText(img_mon, "motion",
+                (30, 30), cv.FONT_HERSHEY_TRIPLEX, 1., (128,200,255) )
+          cv.putText(img_mon, "color",
+                (w//2+30, 30), cv.FONT_HERSHEY_TRIPLEX, 1., (128,200,255) )
+
+        else:
+          img_mon = msk_final
+        cv.imshow("Monitor", cv.resize(img_mon, None, fx=0.4, fy=0.4))
 
       # check for collisions of objects
       sawCollision = False

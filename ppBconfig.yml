@@ -22,7 +22,7 @@ obj_col2: [[0, 50, 50], [22, 255, 255]]  # hsv color range for red object
 fRcollision: 1.9   # scaling of object size for collion detection region (1.5)
 fTarget:     0.11  # required target region around centre of image (0.11)
 fxROI:  0.7        # tracking region x as fraction of image width  (1.0)
-fyROI:  0.7        # tracking region y as fraction of image height (1.0)
+fyROI:  1.         # tracking region y as fraction of image height (1.0)
 
 # video processing
 maxVideoWidth: 1024     # maximum width of video frames (1024)
@@ -30,7 +30,7 @@ maxVideoWidth: 1024     # maximum width of video frames (1024)
 
 # running options 
 playIntro: true        # show trailer if true (true)
-motionDetection: false # differentiate frames to detect ball movements (false)
+motionDetection: true # differentiate frames to detect ball movements (false)
 showMonitoring: true   # show screen with detected objects (false)
 verbose: 0             # print detailed information if >0
 
