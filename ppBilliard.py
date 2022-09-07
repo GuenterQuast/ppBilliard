@@ -774,13 +774,52 @@ class ppBilliard(object):
       cv.setWindowProperty(self.WNam,
                          cv.WND_PROP_FULLSCREEN,
                          cv.WINDOW_FULLSCREEN)
+
     # initialize mouse in video
     self.mouse = vMouse(self.WNam)
 
-  # A required callback method that goes into the trackbar function.
+    # create a window for monitoring an controls if requested
+    if self.showMonitoring:
+      self.WMonNam = "Monitoring" if not self.useCam else "Monitoring&Controls"
+      cv.namedWindow(self.WMonNam, cv.WINDOW_AUTOSIZE)
+      if self.useCam:
+      # add conctol bars for camera
+        self.makeControlbar("Brightness", self.WMonNam,
+                 0, 100, cv.CAP_PROP_BRIGHTNESS,
+                 self.cam_setBrightness)
+        self.makeControlbar("Contraast", self.WMonNam,
+                 0, 100, cv.CAP_PROP_CONTRAST,
+                           self.cam_setContrast)
+        self.makeControlbar("Saturation", self.WMonNam,
+                 0, 100, cv.CAP_PROP_SATURATION,
+                            self.cam_setSaturation)
+        self.makeControlbar("hue", self.WMonNam,
+                 0, 100, cv.CAP_PROP_HUE,
+                            self.cam_setHue)
+
   @staticmethod
   def do_nothing(x):
     pass
+
+  def makeControlbar(self, name, win, min, max, cv_code, cbFunc):
+    """Create a trackbar for camera control
+    """
+    cv.createTrackbar( name, win, min, max, cbFunc)
+    cv.setTrackbarPos( name, win, 
+                       int(self.vSource.vStream.get(cv_code)))
+        
+  def cam_setBrightness(self, val):
+    self.vSource.vStream.set(cv.CAP_PROP_BRIGHTNESS, val)
+
+  def cam_setContrast(self, val):
+    self.vSource.vStream.set(cv.CAP_PROP_CONTRAST, val)
+
+  def cam_setSaturation(self, val):
+    self.vSource.vStream.set(cv.CAP_PROP_SATURATION, val)
+
+  def cam_setHue(self, val):
+    self.vSource.vStream.set(cv.CAP_PROP_HUE, val)
+  
   
   def runCalibration(self):
     """Main Method to run calibration"""
@@ -1125,7 +1164,7 @@ class ppBilliard(object):
         xroi_mx = int( (0.5+self.fxROI/2) * self.swidth)
         yroi_mn = int( (0.5-self.fyROI/2) * self.sheight)
         yroi_mx = int( (0.5+self.fyROI/2) * self.sheight)
-        roi_mask = np.zeros( (h,w), np.uint8)
+        roi_mask = np.zeros( (self.sheight, self.swidth), np.uint8)
         roi_mask = cv.rectangle(roi_mask,
                       (xroi_mn, yroi_mx), (xroi_mx, yroi_mn), 255, -1)
 
@@ -1149,7 +1188,7 @@ class ppBilliard(object):
           Ncnt, mov_mask = detectMotion(grey, lastFrame,
                 self.obj_min_radius, self.obj_max_radius )
           if Ncnt > 1: 
-            msk = mov_mask
+            msk =mov_mask
           else:
             msk = roi_mask
         # save frame 
@@ -1198,9 +1237,9 @@ class ppBilliard(object):
         msk_final = cv.add(msk_obj1, msk_obj2)
         plotTrace(msk_final, self.trk1, lw=2, color=self.obj_bgr1 )
         plotTrace(msk_final, self.trk2, lw=2, color=self.obj_bgr2 )
-        if self.useMotionDetection and mov_mask is not None:
+        if self.useMotionDetection:
           img_mon = cv.hconcat([
-                                 cv.copyMakeBorder(mov_mask,
+                                 cv.copyMakeBorder(msk,
                             10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99)),
                                  cv.copyMakeBorder(msk_final,
                             10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99))
@@ -1213,7 +1252,7 @@ class ppBilliard(object):
 
         else:
           img_mon = msk_final
-        cv.imshow("Monitor", cv.resize(img_mon, None, fx=0.4, fy=0.4))
+        cv.imshow(self.WMonNam, cv.resize(img_mon, None, fx=0.4, fy=0.4))
 
       # check for collisions of objects
       sawCollision = False
