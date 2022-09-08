@@ -423,7 +423,7 @@ def crossfade(win, img1, img0, alpha0=0., nframes=20):
     a = alpha0 + i * dalpha/nframes        
     cv.imshow(win,
               cv.addWeighted(img1, a, img0, 1-a, 0.) )
-    cv.waitKey(40) # show blended image
+    cv.waitKey(25) # show blended image
   return img1
      
 
@@ -666,6 +666,8 @@ class ppBilliard(object):
     self.obj_max_radius = 100 if 'objRmax' not in cD else cD['objRmax']
     # scale factor for size of collision region relative to sum of object radii 
     self.fRcollision = 1.5 if 'fRcollision' not in cD else cD['fRcollision']
+    # scale factor for size of collision region relative to sum of object radii 
+    self.fRapproach = 5. if 'fRapproach' not in cD else cD['fRapproach']
     # fractional size of target region
     self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']    
     # default colors of trackable objects (default green and red objcts)
@@ -944,7 +946,7 @@ class ppBilliard(object):
                max(0, x2-r-1) : min(w-1, x2+r+1)] = roi2      
     # <-- end proton animation
 
-    # draw collision symbol 
+    # draw symbolic pp collision 
     proton.drawCollision(self.WNam, tmpimg, (w//2, h//2), 2*r, 0.)
 #    cv.imshow(self.WNam, tmpimg)
 #      key = cv.waitKey(wait_time) & 0xFF
@@ -955,6 +957,7 @@ class ppBilliard(object):
   @staticmethod
   def getKinematics(t):
     '''Determine velocity from three points along track t
+       needs 3 or 4 valid points along track
        
       Input: 
         t: list of 3 xy-coordinate
@@ -1093,7 +1096,36 @@ class ppBilliard(object):
           "impact: {:.2g}  ".format(d['Iscore']) +
           "asymmetry: {:.2f}".format(d['Asymmetry']) )
     print(" *", 10*" ", "    -->>>    ** ", d['Score'], " **     <<<--")
-    
+
+
+  def init_fromFrame0(self, h, w):
+    # print("  Video resolution: {:d}x{:d}".format(w, h))
+    self.scaleVideo = False
+    if w > self.max_video_width:
+      self.scaleVideo = True
+      self.fWidth = self.max_video_width
+      self.fHeight = int((h*self.fWidth)/w)
+    else:
+      self.fHeight = h
+      self.fWidth = w
+    if self.bkgimg is not None:
+      self.bkgimg = cv.resize(self.bkgimg, (self.fWidth, self.fHeight),
+                         interpolation=cv.INTER_AREA)
+    # playground central region
+    sf = np.sqrt(self.fTarget)/2.
+    self.xtar_mn = int( (0.5-sf) * self.fWidth)
+    self.xtar_mx = int( (0.5+sf) * self.fWidth)
+    self.ytar_mn = int( (0.5-sf) * self.fHeight)
+    self.ytar_mx = int( (0.5+sf) * self.fHeight)
+    # tracking region of interest
+    xroi_mn = int( (0.5-self.fxROI/2) * self.fWidth)
+    xroi_mx = int( (0.5+self.fxROI/2) * self.fWidth)
+    yroi_mn = int( (0.5-self.fyROI/2) * self.fHeight)
+    yroi_mx = int( (0.5+self.fyROI/2) * self.fHeight)
+    self.roi_mask = np.zeros( (self.fHeight, self.fWidth), np.uint8)
+    self.roi_mask = cv.rectangle(self.roi_mask,
+                  (xroi_mn, yroi_mx), (xroi_mx, yroi_mn), 255, -1)
+  
   def run(self):  
     """Main method to run ppBilliard 
 
@@ -1114,7 +1146,13 @@ class ppBilliard(object):
     # wait time between frames for camera/video playback
     tFrame = 1./self.vSource.videoFPS # time for one Frame
     wait_time = 1 
-    
+
+    # status flags 
+    sawMotion = False    # motion of two objects recognized
+    inTargetarea = False # both tracks in (central) target region
+    sawApproach = False  # approach of two objects within (r1+r2)*fRapproach
+    sawCollision = False # collision after close approach within r1+r2)*fRcollision
+
     # initialize frame rate counter
     rate = frameRate()
     
@@ -1128,7 +1166,7 @@ class ppBilliard(object):
 
       # end of video file reached ?
       if frame is None:
-        print ('None recieved from video stream - ending!')
+        print ('No more frame recieved from video stream - ending!')
         break
 
       # empty video buffer 
@@ -1139,42 +1177,17 @@ class ppBilliard(object):
       self.nframes +=1   # count frames
 
       if self.nframes == 1: # frame number one
+        # initialize objects depending an actual frame size
         h, w = frame.shape[:2]
-        # print("  Video resolution: {:d}x{:d}".format(w, h))
-        self.scaleVideo = False
-        if w > self.max_video_width:
-          self.scaleVideo = True
-          self.swidth = self.max_video_width
-          self.sheight = int((h*self.swidth)/w)
-        else:
-          self.sheight = h
-          self.swidth = w
-        if self.bkgimg is not None:
-          self.bkgimg = cv.resize(self.bkgimg, (self.swidth, self.sheight),
-                             interpolation=cv.INTER_AREA)
-        # playground central region
-        sf = np.sqrt(self.fTarget)/2.
-        xtar_mn = int( (0.5-sf) * self.swidth)
-        xtar_mx = int( (0.5+sf) * self.swidth)
-        ytar_mn = int( (0.5-sf) * self.sheight)
-        ytar_mx = int( (0.5+sf) * self.sheight)
-
-        # tracking region of interest
-        xroi_mn = int( (0.5-self.fxROI/2) * self.swidth)
-        xroi_mx = int( (0.5+self.fxROI/2) * self.swidth)
-        yroi_mn = int( (0.5-self.fyROI/2) * self.sheight)
-        yroi_mx = int( (0.5+self.fyROI/2) * self.sheight)
-        roi_mask = np.zeros( (self.sheight, self.swidth), np.uint8)
-        roi_mask = cv.rectangle(roi_mask,
-                      (xroi_mn, yroi_mx), (xroi_mx, yroi_mn), 255, -1)
+        self.init_fromFrame0(h, w)
 
         mov_mask = None
-        msk = roi_mask
+        msk1 = self.roi_mask
         # <-- end actions first frame
         
       # resize frame (may save computation time)
       if self.scaleVideo:
-        frame = cv.resize(frame, (self.swidth, self.sheight),
+        frame = cv.resize(frame, (self.fWidth, self.fHeight),
                           interpolation=cv.INTER_AREA)      
       if self.playIntro:       
          self.showIntro(frame)
@@ -1183,21 +1196,24 @@ class ppBilliard(object):
       if self.useMotionDetection:
       # motion detetction, generate mask with objects
       #   that appeared w.r.t laste frame
-        grey = cv.bitwise_and(cv.cvtColor(frame, cv.COLOR_BGR2GRAY), roi_mask)
+        grey = cv.bitwise_and(cv.cvtColor(frame, cv.COLOR_BGR2GRAY), self.roi_mask)
         if lastFrame is not None:
           Ncnt, mov_mask = detectMotion(grey, lastFrame,
                 self.obj_min_radius, self.obj_max_radius )
-          if Ncnt > 1: 
-            msk =mov_mask
-          else:
-            msk = roi_mask
+          if Ncnt > 1:
+            sawMotion = True   # detected tow moving objets            
+            msk1 = mov_mask
+          elif not sawMotion:
+            msk1 = mov_mask
+          else:  
+            msk1 = self.roi_mask
         # save frame 
         lastFrame = grey.copy()
       else:
-        msk = roi_mask
+        msk1 = self.roi_mask
 
       # apply mask(s), then smooth and convert to HSV color           
-      hsvImg = smoothImage(cv.bitwise_and(frame, frame, mask=msk))
+      hsvImg = smoothImage(cv.bitwise_and(frame, frame, mask=msk1))
   
       # find objects in video frame
       msk_obj1, xy1, R1 = findcircularObject_byColor(hsvImg,
@@ -1220,7 +1236,7 @@ class ppBilliard(object):
         #cv.circle(frame, (int(xy2[0]), int(xy2[1])), int(radius2),
         #        (0, 255, 255), 2)
 
-      # update the tracked-points queue
+      # update the queue of tracked points
       self.trk1.appendleft(xy1)
       self.trk2.appendleft(xy2)
 
@@ -1239,7 +1255,7 @@ class ppBilliard(object):
         plotTrace(msk_final, self.trk2, lw=2, color=self.obj_bgr2 )
         if self.useMotionDetection:
           img_mon = cv.hconcat([
-                                 cv.copyMakeBorder(msk,
+                                 cv.copyMakeBorder(msk1,
                             10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99)),
                                  cv.copyMakeBorder(msk_final,
                             10,10,10,10,cv.BORDER_CONSTANT,value=(99,99,99))
@@ -1255,23 +1271,34 @@ class ppBilliard(object):
         cv.imshow(self.WMonNam, cv.resize(img_mon, None, fx=0.4, fy=0.4))
 
       # check for collisions of objects
-      sawCollision = False
-      nf = 4 # number of valid frames for kinematics 
+      #   needs 3 of 4 valid tracked points for each object
+      nf = 4 # max number of valid frames for kinematics
       if len(self.trk1) >= nf:
         trace1 = np.asarray([self.trk1[i] for i in range(nf)], dtype=object)
         trace2 = np.asarray([self.trk2[i] for i in range(nf)], dtype=object)
-        if not (trace1 == None).any() and not (trace2 == None).any(): 
-          v_r1 = trace1[0]
-          v_r2 = trace2[0]
-          v_dist = v_r2 - v_r1        
-          dist = np.sqrt(np.inner(v_dist, v_dist))
+        if not (trace1 == None).any() and not (trace2 == None).any():
+          nValid = 4
+        elif not (trace1[:nf-1] == None).any() and not (trace2[:nf-1] == None).any():
+          nValid = 3
+        else:
+          nValid = 0 
+        if nValid >=3: 
+          v_r1 = np.asarray(trace1[0])
+          v_r2 = np.asarray(trace2[0])
           # check for collsion in central region of playground
-          if (xtar_mn < v_r1[0] < xtar_mx) and (xtar_mn < v_r2[0] < xtar_mx) and\
-             (ytar_mn < v_r1[1] < ytar_mx) and (ytar_mn < v_r2[1] < ytar_mx) and\
-             (dist <  self.fRcollision * (R1+R2)):        # objects (nearly) touched
+          if not inTargetarea:
+            if (self.xtar_mn<v_r1[0]<self.xtar_mx) and (self.xtar_mn<v_r2[0]<self.xtar_mx) and\
+               (self.ytar_mn<v_r1[1]<self.ytar_mx) and (self.ytar_mn<v_r2[1]<self.ytar_mx) :
+              inTargetarea = True
+          else:  # calulate distance of objects  
+            v_dist = v_r2 - v_r1        
+            dist = np.sqrt(np.inner(v_dist, v_dist))
+            if dist < self.fRapproach * (R1+R2):             # objects approached
+              sawApproach = True
+          if sawApproach and dist < self.fRcollision*(R1+R2):   # objects (nearly) touched
             # get kinematics
-            v_r1, v_v1 = self.getKinematics(trace1)
-            v_r2, v_v2 = self.getKinematics(trace2)
+            v_r1, v_v1 = self.getKinematics(trace1[:nValid])
+            v_r2, v_v2 = self.getKinematics(trace2[:nValid])
             # extrapolate to collision point
             self.v_c01, self.v_c02, self.impactDistance = \
               self.extrapolate2CollisionPoint(v_r1, v_r2, v_v1, v_v2)
@@ -1282,7 +1309,7 @@ class ppBilliard(object):
               sawCollision=True
               # analyze full kinematics
               self.analyzeCollision(v_r1, v_r2, v_v1, v_v2, R1+R2)
-              # draw Collision
+              # draw Collision at impact coordinates
               dist = int(self.CollisionResult['iDistance'])
               angle = int( self.CollisionResult['angle'])
               v_C = self.CollisionResult['iCoordinates']
@@ -1293,10 +1320,10 @@ class ppBilliard(object):
       # put text on first frames
       if self.nframes < 20:
         cv.putText(frame, "New Game",
-                   (self.swidth//10, self.sheight//20),
+                   (self.fWidth//10, self.fHeight//20),
                     cv.FONT_HERSHEY_TRIPLEX, 1, (0,255,100))
       
-      # show the frame on screen
+      # show frame on screen
       cv.imshow(self.WNam, frame)
       key = cv.waitKey(wait_time) & 0xFF
       # if the <esc> key is pressed, stop the loop
@@ -1320,7 +1347,7 @@ class ppBilliard(object):
     # show the frame on screen
     cv.imshow(self.WNam, self.resultFrame)
     
-    cv.waitKey(2000) # wait until key pressed
+    cv.waitKey(100) # show cam image with overlayed symbolic collision
     h, w = self.resultFrame.shape[:2]
     event_img = cv.imread(img_path, cv.IMREAD_COLOR)
     event_img = cv.resize(event_img, (w, h), interpolation=cv.INTER_AREA)
@@ -1331,16 +1358,16 @@ class ppBilliard(object):
     # show score:
     if score is not None:
       cv.putText(frame, " *Score: " + str(score), 
-                   (w-self.swidth//3, self.sheight//25),
+                   (w-self.fWidth//3, self.fHeight//25),
                     cv.FONT_HERSHEY_TRIPLEX, 1, (100,50,100))
 
     # draw colored fields for mouse interactions
     if len(self.mouse.buttons) == 0:
-      w_pad = self.swidth//30
-      h_pad = self.sheight//25
-      id0 = self.mouse.createButton(frame, (0, self.sheight),
+      w_pad = self.fWidth//30
+      h_pad = self.fHeight//25
+      id0 = self.mouse.createButton(frame, (0, self.fHeight),
                                   w_pad, h_pad, (0,255,0), text='c')
-      id1 = self.mouse.createButton(frame, (self.swidth-w_pad, self.sheight),
+      id1 = self.mouse.createButton(frame, (self.fWidth - w_pad, self.fHeight),
                                   w_pad, h_pad, (0,0,255), text='q')
     else:
       self.mouse.drawButtons()

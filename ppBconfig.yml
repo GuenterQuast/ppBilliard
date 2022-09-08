@@ -9,8 +9,6 @@ camFPS:      30       # frame rate             (null)
 camExposure: null     # exposure time in ms    (null)
 camSaturation: null   # color saturation, depends on camera model (null)
 
-
-
 # properties of trackable objects
 objRmin:  10       # minimum radius in pixels (10)
 objRmax: 100       # maximum radius in pixels (100)
@@ -19,7 +17,8 @@ obj_col1 : [[23, 0, 50],[51, 255, 255]]  # hsv color range for green object
 obj_col2: [[0, 50, 50], [22, 255, 255]]  # hsv color range for red object
 
 # collision detection
-fRcollision: 1.9   # scaling of object size for collion detection region (1.5)
+fRapproach: 5.0    # scaling of object size close approach (5.0)
+fRcollision: 1.7   # scaling of object size for collion detection region (1.5)
 fTarget:     0.11  # required target region around centre of image (0.11)
 fxROI:  0.7        # tracking region x as fraction of image width  (1.0)
 fyROI:  1.         # tracking region y as fraction of image height (1.0)
@@ -27,12 +26,11 @@ fyROI:  1.         # tracking region y as fraction of image height (1.0)
 # video processing
 maxVideoWidth: 1024     # maximum width of video frames (1024)
 
-
 # running options 
 playIntro: true        # show trailer if true (true)
-motionDetection: true # differentiate frames to detect ball movements (false)
+motionDetection: true  # differentiate frames to detect ball movements (false)
 showMonitoring: true   # show screen with detected objects (false)
-verbose: 0             # print detailed information if >0
+verbose: 0             # print detailed information if>0  (0)
 
 # images for intro and background (in subdirectory images/)
 introImage: 'ppBilliard_intro.png'
