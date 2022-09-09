@@ -1099,25 +1099,30 @@ class ppBilliard(object):
 
 
   def init_fromFrame0(self, h, w):
-    # print("  Video resolution: {:d}x{:d}".format(w, h))
-    self.scaleVideo = False
+    """Initialize objects depending of frame height and width
+    """
+    # scale frame to maximum size (to save CPU time)
     if w > self.max_video_width:
       self.scaleVideo = True
       self.fWidth = self.max_video_width
       self.fHeight = int((h*self.fWidth)/w)
     else:
+      self.scaleVideo = False
       self.fHeight = h
       self.fWidth = w
+      
+    # scale backtground image to proper size   
     if self.bkgimg is not None:
       self.bkgimg = cv.resize(self.bkgimg, (self.fWidth, self.fHeight),
                          interpolation=cv.INTER_AREA)
-    # playground central region
+    # set coordinates of central region of playground 
     sf = np.sqrt(self.fTarget)/2.
     self.xtar_mn = int( (0.5-sf) * self.fWidth)
     self.xtar_mx = int( (0.5+sf) * self.fWidth)
     self.ytar_mn = int( (0.5-sf) * self.fHeight)
     self.ytar_mx = int( (0.5+sf) * self.fHeight)
-    # tracking region of interest
+    
+    # set mask for active tracking region (roi = region of interest)
     xroi_mn = int( (0.5-self.fxROI/2) * self.fWidth)
     xroi_mx = int( (0.5+self.fxROI/2) * self.fWidth)
     yroi_mn = int( (0.5-self.fyROI/2) * self.fHeight)
@@ -1136,13 +1141,12 @@ class ppBilliard(object):
 
     """
 
+    # --- initialize variables at start of new game
     # no old frame stored (for motion detection)
     lastFrame = None  
-
     # skip some frames after re-start in order to remove old ones
     nskip = 0 if self.first else 3
     self.first = False
-    
     # wait time between frames for camera/video playback
     tFrame = 1./self.vSource.videoFPS # time for one Frame
     wait_time = 1 
@@ -1150,8 +1154,11 @@ class ppBilliard(object):
     # status flags 
     sawMotion = False    # motion of two objects recognized
     inTargetarea = False # both tracks in (central) target region
-    sawApproach = False  # approach of two objects within (r1+r2)*fRapproach
-    sawCollision = False # collision after close approach within r1+r2)*fRcollision
+    sawApproach = False  # approach of two objects within (R1+R2)*fRapproach
+    sawCollision = False # collision after close approach within R1+R2)*fRcollision
+    # count sequences of frames with two or no detected objects
+    nValid = 0
+    nEmpty = 0
 
     # initialize frame rate counter
     rate = frameRate()
@@ -1201,6 +1208,7 @@ class ppBilliard(object):
           Ncnt, mov_mask = detectMotion(grey, lastFrame,
                 self.obj_min_radius, self.obj_max_radius )
           if Ncnt > 1:
+            if self.verbose and not sawMotion: print(" *==*", self.nframes, " Moving objects detected")
             sawMotion = True   # detected tow moving objets            
             msk1 = mov_mask
           elif not sawMotion:
@@ -1215,7 +1223,7 @@ class ppBilliard(object):
       # apply mask(s), then smooth and convert to HSV color           
       hsvImg = smoothImage(cv.bitwise_and(frame, frame, mask=msk1))
   
-      # find objects in video frame
+      # find colored objects in video frame
       msk_obj1, xy1, R1 = findcircularObject_byColor(hsvImg,
                                 self.obj_col1[0], self.obj_col1[1],
                                 self.obj_min_radius, self.obj_max_radius)
@@ -1236,11 +1244,24 @@ class ppBilliard(object):
         #cv.circle(frame, (int(xy2[0]), int(xy2[1])), int(radius2),
         #        (0, 255, 255), 2)
 
-      # update the queue of tracked points
+      # update the queue of tracked points and count valid ones 
+      if xy1 is not None and xy2 is not None:
+        nValid +=1
+        nEmpty = 0
+      else:
+          nValid = 0
+          nEmpty += 1
+         # interpret 3 frames wo. objects as new trial
+      if nEmpty > 2:     
+        sawMotion = False    
+        inTargetarea = False 
+        sawApproach = False  
+        sawCollision = False 
+
       self.trk1.appendleft(xy1)
       self.trk2.appendleft(xy2)
 
-      # add detector contours 
+      # add background image (detector contours)
       if self.bkgimg is not None:
         frame = cv.addWeighted(frame, 0.65, self.bkgimg, 0.35, 0.)
 
@@ -1248,7 +1269,7 @@ class ppBilliard(object):
       plotTrace(frame, self.trk1, lw=2, color=self.obj_bgr1 )
       plotTrace(frame, self.trk2, lw=2, color=self.obj_bgr2 )
   
-      # display monitoring graph(s) for mask
+      # display monitoring graph(s) for masks
       if self.showMonitoring:
         msk_final = cv.add(msk_obj1, msk_obj2)
         plotTrace(msk_final, self.trk1, lw=2, color=self.obj_bgr1 )
@@ -1272,50 +1293,44 @@ class ppBilliard(object):
 
       # check for collisions of objects
       #   needs 3 of 4 valid tracked points for each object
-      nf = 4 # max number of valid frames for kinematics
-      if len(self.trk1) >= nf:
+      nf = 4 if nValid > 3 else 3 if nValid > 2 else None
+      if nf is not None:
         trace1 = np.asarray([self.trk1[i] for i in range(nf)], dtype=object)
         trace2 = np.asarray([self.trk2[i] for i in range(nf)], dtype=object)
-        if not (trace1 == None).any() and not (trace2 == None).any():
-          nValid = 4
-        elif not (trace1[:nf-1] == None).any() and not (trace2[:nf-1] == None).any():
-          nValid = 3
-        else:
-          nValid = 0 
-        if nValid >=3: 
-          v_r1 = np.asarray(trace1[0])
-          v_r2 = np.asarray(trace2[0])
-          # check for collsion in central region of playground
-          if not inTargetarea:
-            if (self.xtar_mn<v_r1[0]<self.xtar_mx) and (self.xtar_mn<v_r2[0]<self.xtar_mx) and\
-               (self.ytar_mn<v_r1[1]<self.ytar_mx) and (self.ytar_mn<v_r2[1]<self.ytar_mx) :
-              inTargetarea = True
-          else:  # calulate distance of objects  
-            v_dist = v_r2 - v_r1        
-            dist = np.sqrt(np.inner(v_dist, v_dist))
-            if dist < self.fRapproach * (R1+R2):             # objects approached
-              sawApproach = True
-          if sawApproach and dist < self.fRcollision*(R1+R2):   # objects (nearly) touched
-            # get kinematics
-            v_r1, v_v1 = self.getKinematics(trace1[:nValid])
-            v_r2, v_v2 = self.getKinematics(trace2[:nValid])
-            # extrapolate to collision point
-            self.v_c01, self.v_c02, self.impactDistance = \
-              self.extrapolate2CollisionPoint(v_r1, v_r2, v_v1, v_v2)
-            if self.verbose:
-              print(" *==* close distance {:.1f}, radius1: {}, radius2: {}".format(dist, R1 ,R2))
-              print("    distance at impact: {:.1f}".format(self.impactDistance))
-            if self.impactDistance < 1.05*(R1+R2):
-              sawCollision=True
-              # analyze full kinematics
-              self.analyzeCollision(v_r1, v_r2, v_v1, v_v2, R1+R2)
-              # draw Collision at impact coordinates
-              dist = int(self.CollisionResult['iDistance'])
-              angle = int( self.CollisionResult['angle'])
-              v_C = self.CollisionResult['iCoordinates']
-              proton.drawCollision(self.WNam, frame, v_C, dist, angle)
-              self.resultFrame=frame.copy()
-              break
+        v_r1 = np.asarray(trace1[0])
+        v_r2 = np.asarray(trace2[0])
+      # check for collsion in central region of playground
+        if not inTargetarea:
+          if (self.xtar_mn<v_r1[0]<self.xtar_mx) and (self.xtar_mn<v_r2[0]<self.xtar_mx) and\
+             (self.ytar_mn<v_r1[1]<self.ytar_mx) and (self.ytar_mn<v_r2[1]<self.ytar_mx) :
+            inTargetarea = True
+        else:  # calulate distance of objects  
+          v_dist = v_r2 - v_r1        
+          dist = np.sqrt(np.inner(v_dist, v_dist))
+          if dist < self.fRapproach * (R1+R2):             # objects approached
+            if self.verbose and not sawApproach: print(" *==*", self.nframes, " Close approach detected")
+            sawApproach = True
+        if sawApproach and dist < self.fRcollision*(R1+R2):   # objects (nearly) touched
+          # get kinematics
+          v_r1, v_v1 = self.getKinematics(trace1[:nValid])
+          v_r2, v_v2 = self.getKinematics(trace2[:nValid])
+          # extrapolate to collision point
+          self.v_c01, self.v_c02, self.impactDistance = \
+            self.extrapolate2CollisionPoint(v_r1, v_r2, v_v1, v_v2)
+          if self.verbose:
+            print(" *==* close distance {:.1f}, radius1: {}, radius2: {}".format(dist, R1 ,R2))
+            print("    distance at impact: {:.1f}".format(self.impactDistance))
+          if self.impactDistance < (R1+R2+2):
+            sawCollision=True
+            # analyze full kinematics
+            self.analyzeCollision(v_r1, v_r2, v_v1, v_v2, R1+R2)
+            # draw Collision at impact coordinates
+            dist = int(self.CollisionResult['iDistance'])
+            angle = int( self.CollisionResult['angle'])
+            v_C = self.CollisionResult['iCoordinates']
+            proton.drawCollision(self.WNam, frame, v_C, dist, angle)
+            self.resultFrame=frame.copy()
+            break
 
       # put text on first frames
       if self.nframes < 20:
@@ -1461,16 +1476,6 @@ if __name__ == "__main__":  # ------------run it ----
 # print greeting message
   print("\n*==* Script ", sys.argv[0], " executing")
 
-# --- check if a configuration dictionary exists
-  confDict = None
-  try:
-    fnam = 'ppBconfig.yml'
-    with open(fnam, 'r') as f:
-      confDict = yaml.load(f, Loader=yaml.Loader)
-    print('  using config from file ' + fnam) 
-  except:
-    pass  
-#
 # --- parse the arguments
   ap = argparse.ArgumentParser()
   ap.add_argument("-f", "--fullscreen", action='store_const',
@@ -1484,8 +1489,21 @@ if __name__ == "__main__":  # ------------run it ----
 	help="videodevice number")
   ap.add_argument("-c", "--calibrate", type=int, default=0,
 	help="find hsv range of trackable object <1/2>")
+  ap.add_argument("-C", "--config", type=str, default="ppBconfig.yml",
+	help="configuration file")
   args = vars(ap.parse_args())
   # print(args)
+
+  # --- check if a configuration dictionary exists
+  confDict = None
+  try:
+    fnam = args["config"]
+    with open(fnam, 'r') as f:
+      confDict = yaml.load(f, Loader=yaml.Loader)
+    print('  using config from file ' + fnam) 
+  except:
+    pass  
+#
   
   videodev_id = args["source"] # video device number of webcam
 
