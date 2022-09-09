@@ -576,6 +576,7 @@ class proton(object):
       _plot(Ri)
       cv.imshow(win, frame)
       key = cv.waitKey(25)
+# <-- end class proton
 
 def bgr2hsv( bgr):
   # convert Blue-Green-Red to Hue-Saturation-Value
@@ -622,10 +623,10 @@ class frameRate():
       self.dt=0
       self.nframes = 0
     return(self.rate)
+# <-- end class frameRate
 
 #
 #---  end helpers --------------------------------------------
-#
 
 class ppBilliard(object):
   """Track colored objects in a video and replace by symbolic Proton
@@ -777,7 +778,7 @@ class ppBilliard(object):
                          cv.WND_PROP_FULLSCREEN,
                          cv.WINDOW_FULLSCREEN)
 
-    # initialize mouse in video
+    # initialize mouse in video window
     self.mouse = vMouse(self.WNam)
 
     # create a window for monitoring an controls if requested
@@ -798,18 +799,22 @@ class ppBilliard(object):
         self.makeControlbar("hue", self.WMonNam,
                  0, 100, cv.CAP_PROP_HUE,
                             self.cam_setHue)
-
-  @staticmethod
-  def do_nothing(x):
-    pass
+        self.makeControlbar("Gamma", self.WMonNam,
+                 0, 100, cv.CAP_PROP_GAMMA,
+                            self.cam_setGamma)
 
   def makeControlbar(self, name, win, min, max, cv_code, cbFunc):
-    """Create a trackbar for camera control
+    """Create trackbar for camera control
     """
     cv.createTrackbar( name, win, min, max, cbFunc)
     cv.setTrackbarPos( name, win, 
                        int(self.vSource.vStream.get(cv_code)))
-        
+
+  # --- callback functions        
+  @staticmethod
+  def do_nothing(x):
+    pass
+
   def cam_setBrightness(self, val):
     self.vSource.vStream.set(cv.CAP_PROP_BRIGHTNESS, val)
 
@@ -821,9 +826,12 @@ class ppBilliard(object):
 
   def cam_setHue(self, val):
     self.vSource.vStream.set(cv.CAP_PROP_HUE, val)
+
+  def cam_setGamma(self, val):
+    self.vSource.vStream.set(cv.CAP_PROP_GAMMA, val)
   
   
-  def runCalibration(self):
+  def runColorCalibration(self):
     """Main Method to run calibration"""
 
     hsv_dict = None  #output dictionary
@@ -1252,7 +1260,9 @@ class ppBilliard(object):
           nValid = 0
           nEmpty += 1
          # interpret 3 frames wo. objects as new trial
-      if nEmpty > 2:     
+      if nEmpty > 2:
+        if self.verbose and nEmpty == 3:
+          print(" *==*", self.nframes, " No objects found, waiting ...")
         sawMotion = False    
         inTargetarea = False 
         sawApproach = False  
@@ -1268,7 +1278,7 @@ class ppBilliard(object):
       # plot object traces from list of tracked points    
       plotTrace(frame, self.trk1, lw=2, color=self.obj_bgr1 )
       plotTrace(frame, self.trk2, lw=2, color=self.obj_bgr2 )
-  
+
       # display monitoring graph(s) for masks
       if self.showMonitoring:
         msk_final = cv.add(msk_obj1, msk_obj2)
@@ -1291,6 +1301,17 @@ class ppBilliard(object):
           img_mon = msk_final
         cv.imshow(self.WMonNam, cv.resize(img_mon, None, fx=0.4, fy=0.4))
 
+      # indicate status 
+      thick = -1 if sawMotion else 2
+      cv.rectangle(frame, (self.fWidth//2-45, 20), (self.fWidth//2-25, 5),
+                   (10, 140, 230), thick)          
+      thick = -1 if sawApproach else 2
+      cv.rectangle(frame, (self.fWidth//2-25, 20), (self.fWidth//2-5, 5),
+                   (10, 230, 230), thick)
+      thick = -1 if sawCollision else 2
+      cv.rectangle(frame, (self.fWidth//2-5, 20), (self.fWidth//2+15, 5),
+                   (20, 20, 255), thick)          
+      
       # check for collisions of objects
       #   needs 3 of 4 valid tracked points for each object
       nf = 4 if nValid > 3 else 3 if nValid > 2 else None
@@ -1328,6 +1349,10 @@ class ppBilliard(object):
             dist = int(self.CollisionResult['iDistance'])
             angle = int( self.CollisionResult['angle'])
             v_C = self.CollisionResult['iCoordinates']
+            # update status display
+            cv.rectangle(frame, (self.fWidth//2-5, 20), (self.fWidth//2+15, 5),
+                        (200, 255, 255), -1)
+            # show animated symbolic collision
             proton.drawCollision(self.WNam, frame, v_C, dist, angle)
             self.resultFrame=frame.copy()
             break
@@ -1419,7 +1444,7 @@ def run_Calibration(ppBilliard_instance):
   # (re-)initialize video stream
   ppBilliard_instance.init()
 
-  hsv_dict = ppBilliard_instance.runCalibration()
+  hsv_dict = ppBilliard_instance.runColorCalibration()
 
   if hsv_dict is not None:
     fnam= 'object'+str(args['calibrate'])+'_hsv.yml'
