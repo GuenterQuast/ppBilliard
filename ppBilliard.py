@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Project ppBilliard
 
-   - Trackingbof two round shapes in a webcam stream 
+   - Tracking of two round shapes in a webcam stream 
    - replace  them by symbolic representation of a proton 
-     (with quarks and gluons inside)
-   - evaluate the kinematics of colliding objects, equivalent to 
-     energy, impact parameter and asymmetry
+   - evaluate the kinematics of colliding objects, equivalent 
+     to energy, impact parameter and asymmetry
 
    Author: Guenter Quast, initial version Aug. 2022  
 """
@@ -248,7 +247,8 @@ def smoothImage(frame, ksize=11):
 def detectMotion(frame, prev_frame, rmin, rmax):
   '''Difference betreen to frames to detect appearing object in frame
     
-    input frames as grey scale images
+    input frames as grey scale images  
+
     Returns binary mask of moving parts of image
   '''
   h0, w0 = frame.shape[:2]
@@ -963,36 +963,9 @@ class ppBilliard(object):
     frame = crossfade(self.WNam, frame, tmpimg)
 
   @staticmethod
-  def getKinematics(t):
-    '''Determine velocity from three points along track t
-       needs 3 or 4 valid points along track
-       
-      Input: 
-        t: list of 3 xy-coordinate
-
-      Returns:
-        r: space point
-        v: velocity
-    '''
-
-    d0 = t[0]-t[1]
-    d1 = t[1]-t[2]
-    # calculate square of cosine of angle between track segments
-    d0d1 = np.inner(d0,d1)
-    cost2 = d0d1*d0d1 / max(1, np.inner(d0,d0)*np.inner(d1,d1) ) 
-    # accept if < 8 deg
-    if cost2 > 0.97:
-      return t[0] , (t[2]-t[0])/2.
-    else: # there is a "kink" in the trace,
-      if len(t) > 3:
-        return t[1] , (t[3]-t[1])/2.
-      else:    
-        return t[1] , d1/1.
-    
-  @staticmethod
-  def extrapolate2CollisionPoint(v_c1, v_c2, v_v1, v_v2):
-    """ caluclate extrapolated distance at collision 
-    assuming movement on straight trajectory
+  def getKinematics(trace1, trace2):
+    """ Get postions and velocites at (recorded) points of closest approach,
+    extrapolated to collision point assuming movement on straight trajectory
 
       time to collision: 
         dt = - (v_dist * v_deltav)/deltav^2
@@ -1001,28 +974,60 @@ class ppBilliard(object):
         d_0^2 = v_{dist}^2 - (v_{dist} * v_deltav) / v_deltav^2
 
       Input: 
-
-        - 2d-vectos positions object 1 and 2 
-        - 2d-vector velocities object 1 and 2
+        - 2d-vectors with traces (=positions) of object 1 and 2 
 
       Returns: 
-          - 2d vectors of positions 1 and 2 at collision
-          - collision distance
-            (assuming movement on staight line with constant velocity)
+        - 2d vectors of postions and velocities of objects 1 and 2
+        - 2d vectors of positions at collision
+        - collision distance
+          (assuming movement on staight line with constant velocity)
     """
-    v_dist = v_c2 - v_c1        
-    v_deltav = v_v2 - v_v1
-    dist_sq = np.inner(v_dist, v_dist)
-    deltav_sq = max(np.inner(v_deltav, v_deltav), 1)
-    dt = -np.inner(v_dist, v_deltav)/deltav_sq
-    # print('dt=',dt)
-    
-    d0_sq = dist_sq - np.inner(v_dist, v_deltav)**2/deltav_sq    
-    v_c01 = v_c1 + v_v1 * dt
-    v_c02 = v_c2 + v_v2 * dt
-    return v_c01, v_c02, np.sqrt(d0_sq)  
 
-  def analyzeCollision(self, v_c1, v_c2, v_v1, v_v2, dmax):
+    def getVelocities(xy):
+      '''Determine velocity from three points on trace t
+        needs 3 or 4 valid points along trace
+       
+        Input:
+          - t: list of >= 3 xy-coordinates
+
+        Returns:
+          - r: space point
+          - v: velocity
+      '''
+
+      d0 = xy[0]-xy[1]
+      d1 = xy[1]-xy[2]
+      # calculate square of cosine of angle between track segments
+      d0d1 = np.inner(d0, d1)
+      cost2 = d0d1*d0d1 / max(1, np.inner(d0,d0)*np.inner(d1,d1) ) 
+      # accept if < 8 deg
+      if cost2 > 0.97:
+        return xy[0] , (xy[2]-xy[0])/2.
+      else: # there is a "kink" in the trace, use point before kink
+        if len(xy) > 3:
+          return xy[1] , (xy[3]-xy[1])/2.
+        else:    
+          return xy[1] , d1/1.
+    # --- end getKinematics    
+
+    # get velocites from traces
+    xy1, v1 = getVelocities(trace1)
+    xy2, v2 = getVelocities(trace2)
+    #
+    # get time and position of closest approach of objects 
+    v_dist = xy1 - xy2        
+    deltav = v2 - v1
+    dist_sq = np.inner(v_dist, v_dist)
+    deltav_sq = max(np.inner(deltav, deltav), 1)
+    d0_sq = dist_sq - np.inner(v_dist, deltav)**2/deltav_sq    
+    dt = -np.inner(v_dist, deltav)/deltav_sq
+    # print('dt=',dt)
+    xy01 = xy1 + v1 * dt
+    xy02 = xy2 + v2 * dt
+    kinematics = (xy1, v1, xy2, v2, xy01, xy02, np.sqrt(d0_sq))
+    return kinematics
+
+  def analyzeCollision(self, dmax):
     """ analyze kinematics of collision of two objects
 
       Input: 
@@ -1043,21 +1048,20 @@ class ppBilliard(object):
           - Asymmetry: momentum asymmetry [-1, 1]
           - Score:     Escore * Iscore 
     """
-   # all coordinates in pixels, time in 1/framerate
+
+   # decode kinematics n-tuple, all coordinates in pixels, time in 1/framerate
+    xy1, v_v1, xy2, v_v2, v_c01, v_c02, impactDistance = self.kinematics
 
    # point of closest approach
-    v_C0 = np.int32(0.5*(self.v_c01 + self.v_c02))
+    v_C0 = np.int32(0.5*(v_c01 + v_c02))
 
    # distance of object centers when colliding
-    v_dist = self.v_c02 - self.v_c01
+    v_dist = v_c02 - v_c01
     angle = int(np.arctan2(v_dist[1], v_dist[0]) * 180/np.pi) 
    # velocities in pixels/time_beweeen_frames
     v1 = max(1, np.sqrt(np.inner(v_v1, v_v1)))
     v2 = max(1, np.sqrt(np.inner(v_v2, v_v2)))
 
-   # extrapolate distance at collision (already calulated erlier)
-    #   self.v_C0, self.impactDistance = self.extrapolate2CollisionPoint
-     
    # momentum in centre-of-mass system
     v_cms = v_v1 + v_v2
     v_vcms1 = v_v1 - v_cms
@@ -1072,7 +1076,7 @@ class ppBilliard(object):
    # impact parameter             
     #Iscore = 0.5 * (abs(np.inner(v_dist/dist, v_v1/v1) ) + 
     #                abs(np.inner(v_dist/dist, v_v2/v2) ) )
-    Iscore = 1. - self.impactDistance/dmax
+    Iscore = 1. - impactDistance/dmax
    # asymmetry
     Asym = np.sqrt(np.inner(v_cms,v_cms)) / (v1+v2)
     Asym = Asym if v1>v2 else -Asym
@@ -1080,7 +1084,7 @@ class ppBilliard(object):
     Score = int(Escore * Iscore)
     self.CollisionResult={
         'iCoordinates' : (v_C0[0], v_C0[1]),
-        'iDistance'    : self.impactDistance, 
+        'iDistance'    : impactDistance, 
         'angle'        : angle, 
         'Escore'       : Escore,
         'Iscore'       : Iscore,
@@ -1333,18 +1337,16 @@ class ppBilliard(object):
             sawApproach = True
         if sawApproach and dist < self.fRcollision*(R1+R2):   # objects (nearly) touched
           # get kinematics
-          v_r1, v_v1 = self.getKinematics(trace1[:nValid])
-          v_r2, v_v2 = self.getKinematics(trace2[:nValid])
-          # extrapolate to collision point
-          self.v_c01, self.v_c02, self.impactDistance = \
-            self.extrapolate2CollisionPoint(v_r1, v_r2, v_v1, v_v2)
+          self.kinematics = self.getKinematics(trace1[:nValid], trace2[:nValid])
+              # kinematics: (xy1, v_v1, xy2, v_v2, v_c01, v_c02, impactDistance) 
+          impactDistance = self.kinematics[-1]
           if self.verbose:
             print(" *==* close distance {:.1f}, radius1: {}, radius2: {}".format(dist, R1 ,R2))
-            print("    distance at impact: {:.1f}".format(self.impactDistance))
-          if self.impactDistance < (R1+R2+2):
+            print("    distance at impact: {:.1f}".format(impactDistance))
+          if impactDistance < (R1+R2+2):
             sawCollision=True
             # analyze full kinematics
-            self.analyzeCollision(v_r1, v_r2, v_v1, v_v2, R1+R2)
+            self.analyzeCollision(R1+R2)
             # draw Collision at impact coordinates
             dist = int(self.CollisionResult['iDistance'])
             angle = int( self.CollisionResult['angle'])
