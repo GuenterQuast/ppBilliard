@@ -643,7 +643,7 @@ class ppBilliard(object):
     #   take values from configuration dictionary if not None
     cD = confDict if confDict is not None else {}
 
-    # options 
+    # options (defaults or read from configuration dictionary)
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
     self.showMonitoring = False if 'showMonitoring' not in cD else cD['showMonitoring']
     self.useMotionDetection = False if 'motionDetection' not in cD else cD['motionDetection']
@@ -670,7 +670,11 @@ class ppBilliard(object):
     # scale factor for size of collision region relative to sum of object radii 
     self.fRapproach = 5. if 'fRapproach' not in cD else cD['fRapproach']
     # fractional size of target region
-    self.fTarget =1./9. if 'fTarget' not in cD else cD['fTarget']    
+    self.fTarget = 1./9. if 'fTarget' not in cD else cD['fTarget']
+    # score ranking (determines class of event picture shown)
+    self.superScore = 10000 if 'superScore' not in cD else cD['superScore']
+    self.highScore = 1000 if 'highScore' not in cD else cD['highScore']
+    self.lowScore = 100 if 'lowScore' not in cD else cD['lowScore']
     # default colors of trackable objects (default green and red objcts)
     self.obj_col1 = [np.array([22,0,58], dtype=np.int16),
                      np.array([51,255,210], dtype=np.int16)] if\
@@ -678,7 +682,7 @@ class ppBilliard(object):
     self.obj_col2 = [np.array([0,90,60], dtype=np.int16),
                      np.array([25,250,255], dtype=np.int16)] if\
       'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)
-    
+
     # width of video (1024, or 800, 600 if CPU limits
     self.max_video_width = 1024 if 'maxVideoWidth' not in cD else \
                            cD['maxVideoWidth']
@@ -1383,21 +1387,37 @@ class ppBilliard(object):
     return self.CollisionResult
     # <-- end of loop
 
-  def showResult(self, img_path='images/3DTower_empty.png', score=None):
+  def showResult(self):
     """Show resultFrame and overlay image from pp collision 
     """
-    # show the frame on screen
+    # show result frame on screen
     cv.imshow(self.WNam, self.resultFrame)
-    
     cv.waitKey(100) # show cam image with overlayed symbolic collision
     h, w = self.resultFrame.shape[:2]
-    event_img = cv.imread(img_path, cv.IMREAD_COLOR)
+
+    # select event picture from score and show it
+    score = self.CollisionResult['Score']
+    if score > self.superScore:
+      eventclass = random.choice(superScore)
+    elif score > self.highScore:
+      eventclass = random.choice(highScore)
+    elif score > self.lowScore:
+      eventclass = random.choice(lowScore)
+    else: 
+      eventclass = random.choice(noScore)
+    path =   eventpath+eventclass
+    filelist = os.listdir(path)
+    i = int(random.random() * len(filelist)) # select picture
+
+    # show picture on video screen    
+    if self.verbose: print("   showing event picture " + path+filelist[i])
+    event_img = cv.imread(path+filelist[i], cv.IMREAD_COLOR)
     event_img = cv.resize(event_img, (w, h), interpolation=cv.INTER_AREA)
     # crossfade to result frame
     frame = crossfade(self.WNam, event_img, self.resultFrame, 0., 50)
     print("\n    - type 'c' to continue, or 'q' or <esc> to exit in video window   - ")
 
-    # show score:
+    # print score:
     if score is not None:
       cv.putText(frame, " *Score: " + str(score), 
                    (w-self.fWidth//3, self.fHeight//25),
@@ -1432,7 +1452,7 @@ class ppBilliard(object):
         break
     #  
     return key
-      
+  
   def stop(self):  
   # --- clean-up at the end
   #
@@ -1460,13 +1480,6 @@ def run_Calibration(ppBilliard_instance):
 def run_ppBilliard(ppBilliard_instance):
   """execute ppBillard"""
   
- # set paths to pp event pictures
-  wd = os.getcwd()
-  eventpath = '/events/'
-  lowScore= ('empty/', 'Cosmics/')
-  highScore = ('2e/', '2mu/', 'general/')
-  superScore = ('2mu2e/', '4mu/')
-    
 # -- loop 
   key = ord('c') 
   while key == ord('c') or key==ord(' '):
@@ -1478,22 +1491,7 @@ def run_ppBilliard(ppBilliard_instance):
   # show result 
     frame = ppBilliard_instance.resultFrame
     ppBilliard_instance.printCollisionResult()
-    score = result['Score']
-  # evaluate score, select event picture and show it
-    # print("  *==* Your score is", int(score) )
-    if score > 2000:
-      eventclass = random.choice(superScore)
-    elif score > 750:
-      eventclass = random.choice(highScore)
-    else:
-      eventclass = random.choice(lowScore)
-    path = os.getcwd()+eventpath+eventclass
-    filelist = os.listdir(path)
-    i = int(random.random() * len(filelist))
-    event_img = path+filelist[i]
-    # - show picture on video screen
-    key = ppBilliard_instance.showResult(event_img, score)
-      
+    key = ppBilliard_instance.showResult()    
     if key == ord('c') or key == ord(' '):       
       print("\n      running again ...\n")
   # <-- end while key == ord('c')
@@ -1503,6 +1501,13 @@ if __name__ == "__main__":  # ------------run it ----
 # print greeting message
   print("\n*==* Script ", sys.argv[0], " executing")
 
+ # set paths to pp event pictures as global variables
+  eventpath = os.getcwd()+'/events/'
+  noScore= ('empty/',)
+  lowScore= ('Cosmics/',)
+  highScore = ('2e/', '2mu/', 'general/')
+  superScore = ('2mu2e/', '4mu/')
+  
 # --- parse the arguments
   ap = argparse.ArgumentParser()
   ap.add_argument("-f", "--fullscreen", action='store_const',
@@ -1525,10 +1530,12 @@ if __name__ == "__main__":  # ------------run it ----
   confDict = None
   try:
     fnam = args["config"]
+    print(fnam)
     with open(fnam, 'r') as f:
       confDict = yaml.load(f, Loader=yaml.Loader)
     print('  using config from file ' + fnam) 
   except:
+    print('!!! failed reading config from file ' + fnam) 
     pass  
 #
   

@@ -20,8 +20,13 @@ obj_col2: [[0, 50, 50], [22, 255, 255]]  # hsv color range for red object
 fRapproach: 5.0    # scaling of object size close approach (5.0)
 fRcollision: 1.7   # scaling of object size for collion detection region (1.5)
 fTarget:     0.11  # required target region around centre of image (0.11)
-fxROI:  0.7        # tracking region x as fraction of image width  (1.0)
+fxROI:  0.7        # tracking region x as fraction of i mage width  (1.0)
 fyROI:  1.         # tracking region y as fraction of image height (1.0)
+
+# score rankings (score = CMS energy * impact distance)
+superScore: 10000 #
+highScore: 1000
+lowScore: 500
 
 # video processing
 maxVideoWidth: 1024     # maximum width of video frames (1024)
