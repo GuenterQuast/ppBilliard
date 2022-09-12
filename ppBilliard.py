@@ -26,7 +26,7 @@ class videoSource(object):
                exposure=None, saturation=None, 
                videoFile=None, videoFPS=None):
     """set parameters of video device"""
-    # store iinput options
+    # store input options
     self.vdev_id = vdev_id
     self.user_cwidth = width
     self.user_cheight = height
@@ -750,13 +750,13 @@ class ppBilliard(object):
     except:
       self.bkgimg = None
       print("* ppBilliard.init: no background image found !")    
-    #
+
     # set-up class managing video source
     self.vSource=videoSource(vdev_id,
                              v_width, v_height, fps, exposure, saturation,
                              videoFile, videoFPS)
     self.videoFile = self.vSource.videoFile
-    #
+
     # --- output greeter
     if self.useCam:
       print("  reading video device ", videodev_id)
@@ -795,7 +795,7 @@ class ppBilliard(object):
     # initialize mouse in video window
     self.mouse = vMouse(self.WNam)
 
-    # create a window for monitoring an controls if requested
+    # create a window for monitoring and controls if requested
     if self.showMonitoring:
       self.WMonNam = "Monitoring" if not self.useCam else "Monitoring&Controls"
       cv.namedWindow(self.WMonNam, cv.WINDOW_AUTOSIZE)
@@ -934,10 +934,10 @@ class ppBilliard(object):
     img = cv.imread('images/'+self.introImageName, cv.IMREAD_COLOR)
     img = cv.resize(img, (w, h), interpolation=cv.INTER_AREA)
 
-    # animate two protons on Intro image
+    # animate two protons on intro image
     r = h//25
     y = h//2
-    nf = 25 # numer of frames to show
+    nf = 30 # numer of frames to show
 
     tmpimg = img.copy() 
     roi1 , roi2 = None, None
@@ -958,7 +958,7 @@ class ppBilliard(object):
 #      proton.draw(tmp, x2, y, r)      
 #  ---
       cv.imshow(self.WNam, tmpimg)
-      cv.waitKey(70) # wait until key pressed
+      cv.waitKey(40) # wait until key pressed
       # write background (overwrite proton image)
       if roi1 is not None:
         tmpimg[max(0, y-r-1) : min(h-1, y+r+1),
@@ -997,12 +997,12 @@ class ppBilliard(object):
           (assuming movement on staight line with constant velocity)
     """
 
-    def getVelocities(xy):
-      '''Determine velocity from three points on trace t
+    def getVelocity(xy):
+      '''Determine velocity from three points on trace xy
         needs 3 or 4 valid points along trace
        
         Input:
-          - t: list of >= 3 xy-coordinates
+          - xy: list of >= 3 xy-coordinates
 
         Returns:
           - r: space point
@@ -1014,7 +1014,7 @@ class ppBilliard(object):
       # calculate square of cosine of angle between track segments
       d0d1 = np.inner(d0, d1)
       cost2 = d0d1*d0d1 / max(1, np.inner(d0,d0)*np.inner(d1,d1) ) 
-      # accept if < 8 deg
+      # accept if angle beteen trace segments < 8 deg
       if cost2 > 0.97:
         return xy[0] , (xy[2]-xy[0])/2.
       else: # there is a "kink" in the trace, use point before kink
@@ -1022,11 +1022,11 @@ class ppBilliard(object):
           return xy[1] , (xy[3]-xy[1])/2.
         else:    
           return xy[1] , d1/1.
-    # --- end getKinematics    
+    # --- end getVelocity    
 
     # get velocites from traces
-    xy1, v1 = getVelocities(trace1)
-    xy2, v2 = getVelocities(trace2)
+    xy1, v1 = getVelocity(trace1)
+    xy2, v2 = getVelocity(trace2)
     #
     # get time and position of closest approach of objects 
     v_dist = xy1 - xy2        
@@ -1125,7 +1125,7 @@ class ppBilliard(object):
 
 
   def init_fromFrame0(self, h, w):
-    """Initialize objects depending of frame height and width
+    """Initialize objects depending height and width pf frame
     """
     # scale frame to maximum size (to save CPU time)
     if w > self.max_video_width:
