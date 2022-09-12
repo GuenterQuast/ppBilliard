@@ -1530,12 +1530,13 @@ if __name__ == "__main__":  # ------------run it ----
   confDict = None
   try:
     fnam = args["config"]
-    print(fnam)
     with open(fnam, 'r') as f:
       confDict = yaml.load(f, Loader=yaml.Loader)
     print('  using config from file ' + fnam) 
-  except:
-    print('!!! failed reading config from file ' + fnam) 
+  except (OSError, yaml.YAMLError) as exception:
+    print("  Exception: " + str(exception))
+    print("!!! failed reading config from file " + fnam)
+    print("    continuing with defaults") 
     pass  
 #
   
