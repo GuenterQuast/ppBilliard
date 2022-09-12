@@ -27,6 +27,12 @@ fyROI:  1.         # tracking region y as fraction of image height (1.0)
 superScore: 10000 #
 highScore: 1000
 lowScore: 500
+# directories with event pictures
+dir_events: 'events/'   # name of top-directory for event pictures
+dirs_noScore:    ['empty/']
+dirs_lowScore:   ['Cosmics/']
+dirs_highScore:  ['2e/', '2mu/', 'general/']
+dirs_superScore: ['2mu2e/', '4mu/']
 
 # video processing
 maxVideoWidth: 1024     # maximum width of video frames (1024)

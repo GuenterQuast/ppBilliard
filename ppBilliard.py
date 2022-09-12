@@ -675,6 +675,16 @@ class ppBilliard(object):
     self.superScore = 10000 if 'superScore' not in cD else cD['superScore']
     self.highScore = 1000 if 'highScore' not in cD else cD['highScore']
     self.lowScore = 100 if 'lowScore' not in cD else cD['lowScore']
+    # location of event pictures
+    self.dir_events = 'events/' if 'dir_events' in cD else cD['dir_events']
+    self.dirs_noScore = ['empty/'] if 'dirs_noScore' in cD \
+                         else cD['dirs_noScore']
+    self.dirs_lowScore = ['Cosmics/'] if 'dirs_lowScore' in cD \
+                         else cD['dirs_lowScore']
+    self.dirs_highScore = ['2e/', '2mu/', 'general/'] if 'dirs_highScore' in cD \
+                         else cD['dirs_highScore']
+    self.dirs_superScore = ['2mu2e/', '4mu/'] if 'dirs_superScore' in cD \
+                         else cD['dirs_superScore']
     # default colors of trackable objects (default green and red objcts)
     self.obj_col1 = [np.array([22,0,58], dtype=np.int16),
                      np.array([51,255,210], dtype=np.int16)] if\
@@ -1398,14 +1408,14 @@ class ppBilliard(object):
     # select event picture from score and show it
     score = self.CollisionResult['Score']
     if score > self.superScore:
-      eventclass = random.choice(superScore)
+      eventclass = random.choice(self.dirs_superScore)
     elif score > self.highScore:
-      eventclass = random.choice(highScore)
+      eventclass = random.choice(self.dirs_highScore)
     elif score > self.lowScore:
-      eventclass = random.choice(lowScore)
+      eventclass = random.choice(self.dirs_lowScore)
     else: 
-      eventclass = random.choice(noScore)
-    path =   eventpath+eventclass
+      eventclass = random.choice(self.dirs_noScore)
+    path =   self.dir_events + eventclass
     filelist = os.listdir(path)
     i = int(random.random() * len(filelist)) # select picture
 
@@ -1501,13 +1511,6 @@ if __name__ == "__main__":  # ------------run it ----
 # print greeting message
   print("\n*==* Script ", sys.argv[0], " executing")
 
- # set paths to pp event pictures as global variables
-  eventpath = os.getcwd()+'/events/'
-  noScore= ('empty/',)
-  lowScore= ('Cosmics/',)
-  highScore = ('2e/', '2mu/', 'general/')
-  superScore = ('2mu2e/', '4mu/')
-  
 # --- parse the arguments
   ap = argparse.ArgumentParser()
   ap.add_argument("-f", "--fullscreen", action='store_const',
