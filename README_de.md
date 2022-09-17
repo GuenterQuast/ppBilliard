@@ -7,17 +7,19 @@
 
 
 Lass zwei Kugeln auf einem Tisch zusammenprallen und sieh, was passiert,
-wenn sie Protonen im Large Hadron Collider am CERN wären!
+wenn sie 
+  >  >  >  **Protonen im Large Hadron Collider am CERN** wären!
 
 > ![](ppBilliard.png)
 
 Dieses Projekt verwendet ein Tischspielbrett für die Videoaufnahme
-kollidierender runder farbiger Objekte mit einer Webkamera.
+kollidierender farbiger Objekte mit einer Webkamera.
 Kollisionsparameter wie die äquivalente Schwerpunktsenergie,
 Aufpralldistanz und Asymmetrie werden automatisch ermittelt.
-Diese werden so skaliert, dass sie den Parametern einer Proton-Proton 
-Proton-Proton-Kollision in einem Hochenergie-Collider entsprechen und
-Bilder entsprechender Spuren der Teilchenkollisionen werden gezeigt. 
+Diese werden so skaliert, dass sie den Parametern einer
+Proton-Proton-Kollision in einem Hochenergie-Collider entsprechen 
+und Bilder entsprechender Spuren von Teilchenkollisionen werden 
+zufällig ausgewählt und gezeigt. 
 
 Dieser Python-Code stützt sich stark auf die Open Source Computer
 Vision Library [OpenCV] (https://opencv.org/).  
@@ -55,6 +57,8 @@ auf der Kommandozeile ein, was die folgende Ausgabe erzeugt:
                        Nummer des Videogeräts
     -c CALIBRATE, --kalibrieren CALIBRATE
                        hsv-Bereich des verfolgbaren Objekts finden <1/2>
+    -C CONFIG, --config CONFIG     
+                       Konfigurationsdatei 
 ```
 
 Normalerweise ist die Nummer des Videogeräts für die Webcam 0; falls 
@@ -66,7 +70,9 @@ nicht, verwenden Sie den Parameter '-s n' mit der Gerätenummer 'n'.
 Wenn Sie das Programm ohne andere Argumente als die Gerätenummer starten 
 wird ein kurzer Trailer angezeigt und dann auf die Anzeige der Webcam-
 Ausgabe umgeschaltet. Wenn ein verfolgbares Objekt wie ein farbiger Ball 
-oder Kreis identifiziert wird, wird es durch eine symbolische, animierte Darstellung eines Protons ersetzt und im Video verfolgt, während Sie es herumbewegen.
+oder Kreis identifiziert wird, wird es durch eine symbolische, animierte 
+Darstellung eines Protons ersetzt und im Video verfolgt, während Sie es
+herumbewegen.
 
 Wenn kein Objekt erkannt wird, ist ein Kalibrierungsschritt erforderlich.
 Schließen Sie das Programm durch Eingabe von `<esc>` oder 'q' im Videofenster
@@ -90,23 +96,23 @@ angezeigt:
 die äquivalente Schwerpunktsenergie (in Einheiten von cm²/s²
 (unter der Annahme einer Bildauflösung von 10 Pixeln/cm) für ein Objekt
 einer Masseneinheit), der Stoßparameter (0 bis 1) und die
-Impulsasymmetrie im Massenschwerpunkt (-1 bis 1).
-
-Abhängig von der "Intensität" der Kollision wird dann ein Ereignisbild
-aus dem [CMS-Detektor] (https://cms.cern) am CERN auf dem
-Video-Bildschirm  angezeigt. 
+Impulsasymmetrie im Massenschwerpunkt (-1 bis 1). Als Mass für die
+"Intensität" der Kollision wird im Video-Fenster ein Punkte-Score für
+die Kollision ausgegeben, mit dem zufällig ein entsprechendes
+Ereignisbild aus dem [CMS-Detektor] (https://cms.cern) am CERN auf dem
+Video-Bildschirm  angezeigt wird. 
 
 Beispiel
 --------
 Zur Demonstration können Sie das Programm auf eine vorbereitete Videodatei
 anwenden, die kurze Sequenzen von Zusammenstößen zwischen einem roten und
-einem grünen Gummiball zeigt. Führen Sie einfach
-```
-     python3 ppBilliard.py -v videos/Flummies.webm
-```
-auf der Kommandozeile aus.
-Die notwendigen Kalibrierungsdateien für die Farberkennung sind im
-Paket enthalten. Wenn Sie die Kalibrierung selbst ausprobieren möchten,
+einem grünen Flummi zeigt. Führen Sie einfach
+  > `python3 ppBilliard.py -v videos/Flummies.webm`
+
+auf der Kommandozeile aus.´
+Die notwendigen Kalibrierungsdaten für die Farberkennung in diesem
+Beispiel sind im Paket vorkonfiguriert. 
+Wenn Sie die Kalibrierung selbst ausprobieren möchten,
 fügen Sie die Option "-c 1" hinzu.  
 Dieses einfache Arrangement wurde mit einem roten und einem grünen
 Flummi von etwa 2,5 cm Durchmesser auf einem schwarzen Tuch
@@ -126,7 +132,9 @@ Szenario eine Herausforderung sein.
 
 Die Auswahl der Kollisionsbilder könnte deutlich ausgefeilter sein.
 So könnte ein echter Wettbewerb der Teams um die größte Ausbeute
-von interessanten Ereignissen entstehen. Die derzeitige Auswahl von Kollisionsereignissen aus dem CMS-Experiment kann leicht durch 
-Sammlungen von Bildern aus anderen Quellen ersetzt werden.
+von interessanten Ereignissen und eine interessante Diskussion um
+deren Bedeutung entstehen. Die derzeitige Auswahl von Kollisionsereignissen 
+aus dem CMS-Experiment kann leicht durch Sammlungen von Bildern aus 
+anderen Quellen ersetzt werden.
 
 **Bitte tragen Sie bei!**

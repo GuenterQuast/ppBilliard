@@ -2,6 +2,9 @@
 ## Project **p(roton)p(roton) Billiard**
 ****************************************
 
+> > [Link zur Anleitung in deutscher Sprache](README_de.md)
+
+
 About
 -----
 
@@ -51,6 +54,8 @@ After downloading the ppBilliard package, type
                           videodevice number
     -c CALIBRATE, --calibrate CALIBRATE
                           find hsv range of trackable object <1/2>
+    -C CONFIG, --config CONFIG
+                          configuration file
 ```
 
 Usually, the number of the video device for the webcam is 0; if 
@@ -87,19 +92,18 @@ the equivalent centre-of-mass energy (in units of cm²/s²
 (assuming 10 pixels/cm image resolution) for an object
 of unit mass), the impact parameter (0 to 1) and the
 momentum asymmetry in the centre-of-mass frame (-1 to 1).
-Depending on the "intensity" of the collision, an event picture
-from the [CMS Detector](https://cms.cern) at CERN appears on the
-video screen.
+Depending on the "intensity" of the collision, an suitable 
+event picture from the [CMS Detector](https://cms.cern) at 
+CERN appears on the video screen.
 
 Example
 --------
 As a demonstration, you may want to run the program on a prepared 
 video file, which shows short sequences of collisions of a red
-and an green rubber ball. Just execute
+and a green rubber ball. Just execute
 
-```
-     python3 ppBilliard.py -v videos/Flummies.webm
-```
+  > `python3 ppBilliard.py -v videos/Flummies.webm`
+
 from the command line. The necessary calibration files for
 the color detection are included in the package. If you
 want to try out the calibration yourself, just add the
@@ -119,9 +123,11 @@ might be a simple board for a mobile version, or a true play
 ground with (colored) footballs in a sports field - although
 placing the camera in the latter scenario may be a challenge. 
 
-The selection of collision images could be more sophisticated.
+The selection of collision images could be more sophisticated
+and better didactically motivated. 
 As a result, a true competition of teams for the largest harvest
-of interesting events could arise.
+of interesting results and discussions on the physics behind the
+event pictures could arise.
 
 The present selection of collision events from the CMS experiment 
 can easily be replaced by collections of images from other sources.
