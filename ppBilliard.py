@@ -647,6 +647,7 @@ class ppBilliard(object):
     self.playIntro = True  if 'playIntro' not in cD else cD['playIntro']
     self.showMonitoring = False if 'showMonitoring' not in cD else cD['showMonitoring']
     self.useMotionDetection = False if 'motionDetection' not in cD else cD['motionDetection']
+    self.eventTimeout = -1 if 'eventTimeout' not in cD else cD['eventTimeout']
     self.verbose = 0 if 'verbose' not in cD else cD['verbose']
     
     # default frame rate for replay of video files
@@ -693,9 +694,11 @@ class ppBilliard(object):
                      np.array([25,250,255], dtype=np.int16)] if\
       'obj_col2' not in cD else np.array(cD['obj_col2'], dtype=np.int16)
 
-    # width of video (1024, or 800, 600 if CPU limits
-    self.max_video_width = 1024 if 'maxVideoWidth' not in cD else \
+    # width of video (1080, or 800, 600 if CPU limits
+    self.max_video_width = 1080 if 'maxVideoWidth' not in cD else \
                            cD['maxVideoWidth']
+    self.pixels_per_cm = 10 if 'pixels_per_cm' not in cD else \
+                           cD['pixels_per_cm']   
     self.bkgImageName = 'RhoZ_black.png' if 'bkgImage' not in cD else \
                         cD['bkgImage']
     self.introImageName =  'ppBilliard_intro.png' if 'introImage' not in cD \
@@ -1084,9 +1087,8 @@ class ppBilliard(object):
     vcms2sq = np.inner(v_vcms2, v_vcms2)
     
    # collision energy in centre-of-mass system
-    pixels_per_cm = 10
     # correct for frame rate, assume image resolution 10 pixels/cm 
-    Escore = 0.5*(vcms1sq + vcms2sq)/pixels_per_cm**2 * self.framerate**2
+    Escore = 0.5*(vcms1sq + vcms2sq)/self.pixels_per_cm**2 * self.framerate**2
    # impact parameter             
     #Iscore = 0.5 * (abs(np.inner(v_dist/dist, v_v1/v1) ) + 
     #                abs(np.inner(v_dist/dist, v_v2/v2) ) )
@@ -1445,6 +1447,7 @@ class ppBilliard(object):
       self.mouse.drawButtons()
     #  
     # show image with buttons ...
+    t0 = time.time()
     cv.imshow(self.WNam, frame)
     #
     # ... and wait for user reply
@@ -1460,6 +1463,9 @@ class ppBilliard(object):
           break
       if key is not None and key != -1:
         break
+      if self.eventTimeout > 0 and (time.time()-t0) > self.eventTimeout:
+        key = ord('c')
+        break        
     #  
     return key
   

@@ -35,13 +35,15 @@ dirs_highScore:  ['2e/', '2mu/', 'general/']
 dirs_superScore: ['2mu2e/', '4mu/']
 
 # video processing
-maxVideoWidth: 1024     # maximum width of video frames (1024)
+maxVideoWidth: 1080    # maximum width of video frames (1024)
+pixels_per_cm:    10   # video pixels per cm (10)
 
 # running options 
 playIntro: true        # show trailer if true (true)
 motionDetection: true  # differentiate frames to detect ball movements (false)
-showMonitoring: true   # show screen with detected objects (false)
+showMonitoring: false   # show screen with detected objects (false)
 verbose: 0             # print detailed information if>0  (0)
+eventTimeout: 10       # timeout for event picture display (-1)
 
 # images for intro and background (in subdirectory images/)
 introImage: 'ppBilliard_intro.png'
