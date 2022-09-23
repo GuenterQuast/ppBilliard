@@ -9,12 +9,13 @@ camFPS:      30       # frame rate             (null)
 camExposure: null     # exposure time in ms    (null)
 camSaturation: null   # color saturation, depends on camera model (null)
 # ranges of camera parameters (e.g. from ouput of v4l2-ctl --all)
-#   used for trackbars if showMonitoring set to true 
-rangeBrightness: [0, 100] # brightness ([0, 100])
-rangeContrast: [0, 100]   # contrast   ([0, 100])
-rangeSaturation: [0, 100] # saturation ([0, 100])
-rangeHue: [0, 100]        # hue        ([0, 100])
-rangeGamma: [0, 100]      # Gamma      ([0, 100])
+#   used for trackbars if showMonitoring set to true
+#  values for ELP USBFHD01M-SFV wide-angle camera with OV2710 Chip
+rangeBrightness: [-64, 64] # brightness ([0, 100])
+rangeContrast: [0, 64]     # contrast   ([0, 100])
+rangeSaturation: [0, 128]  # saturation ([0, 100])
+rangeHue: [-40, 40]        # hue        ([0, 100])
+rangeGamma: [72, 500]      # Gamma      ([0, 100])
 
 # properties of trackable objects
 objRmin:  10       # minimum radius in pixels (10)
@@ -42,8 +43,8 @@ dirs_highScore:  ['2e/', '2mu/', 'general/']
 dirs_superScore: ['2mu2e/', '4mu/']
 
 # video processing
-maxVideoWidth: 1080    # maximum width of video frames (1024)
-pixels_per_cm:    10   # video pixels per cm (10)
+maxVideoWidth: 1000   # maximum width of video frames (1024)
+pixels_per_cm:   10   # video pixels per cm (10)
 
 # running options 
 playIntro: true        # show trailer if true (true)

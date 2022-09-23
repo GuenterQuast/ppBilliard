@@ -849,24 +849,24 @@ class ppBilliard(object):
     pass
 
   def cam_setBrightness(self, val):
-    v = self.bright_mn + val * (self.bright_mx -self.bright_mn)/100
+    v = self.bright_mn + val * (self.bright_mx - self.bright_mn)/100
     self.vSource.vStream.set(cv.CAP_PROP_BRIGHTNESS, v)
 
   def cam_setContrast(self, val):
-    v = self.contr_mn + val * (self.contr_mx -self.contr_mn)/100
+    v = self.contr_mn + val * (self.contr_mx - self.contr_mn)/100
     self.vSource.vStream.set(cv.CAP_PROP_CONTRAST, v)
 
   def cam_setSaturation(self, val):
-    v = self.sat_mn + val * (self.sat_mx -self.sat_mn)/100
+    v = self.sat_mn + val * (self.sat_mx - self.sat_mn)/100
     self.vSource.vStream.set(cv.CAP_PROP_SATURATION, v)
 
   def cam_setHue(self, val):
-    v = self.hue_mn + val * (self.hue_mx -self.hue_mn)/100
+    v = self.hue_mn + val * (self.hue_mx - self.hue_mn)/100
     self.vSource.vStream.set(cv.CAP_PROP_HUE, v)
 
   def cam_setGamma(self, val):
-    v = self.gamma_mn + val * (self.gamma_mx -self.gamma_mn)/100
-    self.vSource.vStream.set(cv.CAP_PROP_GAMMA, val)
+    v = self.gamma_mn + val * (self.gamma_mx - self.gamma_mn)/100
+    self.vSource.vStream.set(cv.CAP_PROP_GAMMA, v)
   
 
   def runColorCalibration(self):
