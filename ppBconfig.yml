@@ -8,6 +8,13 @@ camHeight:  720       # desired picture height (null)
 camFPS:      30       # frame rate             (null)
 camExposure: null     # exposure time in ms    (null)
 camSaturation: null   # color saturation, depends on camera model (null)
+# ranges of camera parameters (e.g. from ouput of v4l2-ctl --all)
+#   used for trackbars if showMonitoring set to true 
+rangeBrightness: [0, 100] # brightness ([0, 100])
+rangeContrast: [0, 100]   # contrast   ([0, 100])
+rangeSaturation: [0, 100] # saturation ([0, 100])
+rangeHue: [0, 100]        # hue        ([0, 100])
+rangeGamma: [0, 100]      # Gamma      ([0, 100])
 
 # properties of trackable objects
 objRmin:  10       # minimum radius in pixels (10)
@@ -17,8 +24,8 @@ obj_col1 : [[23, 0, 50],[51, 255, 255]]  # hsv color range for green object
 obj_col2: [[0, 50, 50], [22, 255, 255]]  # hsv color range for red object
 
 # collision detection
-fRapproach: 5.0    # scaling of object size close approach (5.0)
-fRcollision: 1.7   # scaling of object size for collion detection region (1.5)
+fRapproach: 3.0    # scaling of object size close approach (3.0)
+fRcollision: 1.75  # scaling of object size for collion detection region (1.5)
 fTarget:     0.11  # required target region around centre of image (0.11)
 fxROI:  0.7        # tracking region x as fraction of i mage width  (1.0)
 fyROI:  1.         # tracking region y as fraction of image height (1.0)
@@ -41,7 +48,7 @@ pixels_per_cm:    10   # video pixels per cm (10)
 # running options 
 playIntro: true        # show trailer if true (true)
 motionDetection: true  # differentiate frames to detect ball movements (false)
-showMonitoring: false   # show screen with detected objects (false)
+showMonitoring: true   # show screen with detected objects (false)
 verbose: 0             # print detailed information if>0  (0)
 eventTimeout: 10       # timeout for event picture display (-1)
 

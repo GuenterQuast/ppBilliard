@@ -659,7 +659,17 @@ class ppBilliard(object):
     fps = None if 'camFPS' not in cD else cD['camFPS']
     exposure = None if 'camExposure' not in cD else cD['camExposure']
     saturation = None if 'camSaturation' not in cD else cD['camSaturation']
-
+    rangeBrightness = [0, 100] if 'rangeBrightness' not in cD else cD['rangeBrightness']
+    rangeContrast = [0, 100] if 'rangeContrast' not in cD else cD['rangeContrast']
+    rangeSaturation = [0,100] if 'rangeSaturation' not in cD else cD['rangeSaturation']
+    rangeHue = [0, 100] if 'rangeHue' not in cD else cD['rangeHue']
+    rangeGamma = [0, 100] if 'rangeGamma' not in cD else cD['rangeGamma']
+    self.bright_mn, self.bright_mx = rangeBrightness[0], rangeBrightness[1]
+    self.contr_mn, self.contr_mx = rangeContrast[0], rangeContrast[1]
+    self.sat_mn, self.sat_mx = rangeSaturation[0], rangeSaturation[1]
+    self.hue_mn, self.hue_mx = rangeHue[0], rangeHue[1]
+    self.gamma_mn, self.gamma_mx = rangeGamma[0], rangeGamma[1]
+    
     # fraction of image area used for objcet tracking
     self.fxROI = 1.0 if 'fxROI' not in cD else cD['fxROI']
     self.fyROI = 1.0 if 'fyROI' not in cD else cD['fyROI']
@@ -669,7 +679,7 @@ class ppBilliard(object):
     # scale factor for size of collision region relative to sum of object radii 
     self.fRcollision = 1.5 if 'fRcollision' not in cD else cD['fRcollision']
     # scale factor for size of collision region relative to sum of object radii 
-    self.fRapproach = 5. if 'fRapproach' not in cD else cD['fRapproach']
+    self.fRapproach = 3. if 'fRapproach' not in cD else cD['fRapproach']
     # fractional size of target region
     self.fTarget = 1./9. if 'fTarget' not in cD else cD['fTarget']
     # score ranking (determines class of event picture shown)
@@ -805,27 +815,33 @@ class ppBilliard(object):
       if self.useCam:
       # add conctol bars for camera
         self.makeControlbar("Brightness", self.WMonNam,
-                 0, 100, cv.CAP_PROP_BRIGHTNESS,
-                 self.cam_setBrightness)
+                            self.bright_mn, self.bright_mx,
+                            cv.CAP_PROP_BRIGHTNESS,
+                            self.cam_setBrightness)
         self.makeControlbar("Contraast", self.WMonNam,
-                 0, 100, cv.CAP_PROP_CONTRAST,
-                           self.cam_setContrast)
+                            self.contr_mn, self.contr_mx,
+                            cv.CAP_PROP_CONTRAST,
+                            self.cam_setContrast)
         self.makeControlbar("Saturation", self.WMonNam,
-                 0, 100, cv.CAP_PROP_SATURATION,
+                            self.sat_mn, self.sat_mx,
+                            cv.CAP_PROP_SATURATION,
                             self.cam_setSaturation)
-        self.makeControlbar("hue", self.WMonNam,
-                 0, 100, cv.CAP_PROP_HUE,
+        self.makeControlbar("hue", self.WMonNam, 
+                            self.hue_mn, self.hue_mx,
+                            cv.CAP_PROP_HUE,
                             self.cam_setHue)
-        self.makeControlbar("Gamma", self.WMonNam,
-                 0, 100, cv.CAP_PROP_GAMMA,
+        self.makeControlbar("Gamma", self.WMonNam, 
+                            self.gamma_mn, self.gamma_mx,
+                            cv.CAP_PROP_GAMMA,
                             self.cam_setGamma)
 
   def makeControlbar(self, name, win, min, max, cv_code, cbFunc):
     """Create trackbar for camera control
     """
-    cv.createTrackbar( name, win, min, max, cbFunc)
-    cv.setTrackbarPos( name, win, 
-                       int(self.vSource.vStream.get(cv_code)))
+    v =  int(self.vSource.vStream.get(cv_code)) # acutal setting
+    # transform to range 0 - 100
+    v100 = int( 100 * (v-min)/(max-min) )
+    cv.createTrackbar( name, win, v100, 100, cbFunc)
 
   # --- callback functions        
   @staticmethod
@@ -833,21 +849,26 @@ class ppBilliard(object):
     pass
 
   def cam_setBrightness(self, val):
-    self.vSource.vStream.set(cv.CAP_PROP_BRIGHTNESS, val)
+    v = self.bright_mn + val * (self.bright_mx -self.bright_mn)/100
+    self.vSource.vStream.set(cv.CAP_PROP_BRIGHTNESS, v)
 
   def cam_setContrast(self, val):
-    self.vSource.vStream.set(cv.CAP_PROP_CONTRAST, val)
+    v = self.contr_mn + val * (self.contr_mx -self.contr_mn)/100
+    self.vSource.vStream.set(cv.CAP_PROP_CONTRAST, v)
 
   def cam_setSaturation(self, val):
-    self.vSource.vStream.set(cv.CAP_PROP_SATURATION, val)
+    v = self.sat_mn + val * (self.sat_mx -self.sat_mn)/100
+    self.vSource.vStream.set(cv.CAP_PROP_SATURATION, v)
 
   def cam_setHue(self, val):
-    self.vSource.vStream.set(cv.CAP_PROP_HUE, val)
+    v = self.hue_mn + val * (self.hue_mx -self.hue_mn)/100
+    self.vSource.vStream.set(cv.CAP_PROP_HUE, v)
 
   def cam_setGamma(self, val):
+    v = self.gamma_mn + val * (self.gamma_mx -self.gamma_mn)/100
     self.vSource.vStream.set(cv.CAP_PROP_GAMMA, val)
   
-  
+
   def runColorCalibration(self):
     """Main Method to run calibration"""
 
