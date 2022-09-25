@@ -1586,10 +1586,10 @@ if __name__ == "__main__":  # ------------run it ----
                  "   'r' to run ppBilliard or anything else to quit-> " )
     if answ == '1' :
       args['calibrate'] = 1
-      run_Calibration()
+      run_Calibration(ppB)
     elif answ == '2' :
       args['calibrate'] = 2
-      run_Calibration()
+      run_Calibration(ppB)
     elif answ =='r' :
       args['calibrate'] = 0
     else:  
