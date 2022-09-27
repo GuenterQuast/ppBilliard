@@ -190,11 +190,11 @@ haben muss als Objekt 1! Die so erzeugten Daten werden in den Dateien
 vorhanden sind oder gelöscht wurden, werden die Voreinstellungen aus
 der Konfigurationsdatei verwendet. 
 
-### Konfiguration
+#### Konfiguration
 
 Die Konfiguration von *ppBilliard* kann sehr flexibel über eine
 Konfigurationsdatei angepasst werden. 
-Hier der INhalt der mitgelieferten Datei *ppBconfig.yml*:
+Hier der Inhalt der mitgelieferten Datei *ppBconfig.yml*:
 
 ```
 ## configuration parameters for *p(roton)p(roton)Billiard*
