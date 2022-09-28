@@ -89,9 +89,8 @@ die äquivalente Schwerpunktsenergie (in Einheiten von cm²/s²
 einer Masseneinheit), der Stoßparameter (0 bis 1) und die
 Impulsasymmetrie im Massenschwerpunkt (-1 bis 1). Als Maß für die
 "Intensität" der Kollision wird im Video-Fenster ein Punkte-Score für
-die Kollision ausgegeben, mit dem zufällig ein entsprechendes
-Ereignisbild aus dem [CMS-Detektor] (https://cms.cern) am CERN auf dem
-Video-Bildschirm  angezeigt wird. 
+die Kollision ausgegeben; passend dazu wir zufällig ein entsprechendes
+Ereignisbild ausgewählt und auf dem Video-Bildschirm  angezeig. 
 
 
 Beispiel
@@ -138,16 +137,17 @@ verfolgt werden können. Die Vorgehensweise zur Farbkalibration ist weiter
 unten beschrieben. 
 
 Wenn Sie nun das Programm starten und die Bälle bewegen, sollte eine 
-Spur der Koordinaten im Videofenseter erscheinen. Achten Sie darauf, dass
-die Eingezeichneten Markierungen gleichmäßig sind, also keine Punkte fehlen!
-Achten Sie darauf, dass die Farbtöne der beiden Bälle klar unterscheidbar sind.
-Passen Sie ggf. die Helligkeit der Kamera und die Lichtverhältnisse an. 
-Wiederholen Sie ggf. die Kalibration.
+Spur der Koordinaten im Videofenseter erscheinen. Achten Sie darauf,
+dass die Eingezeichneten Markierungen gleichmäßig sind, also keine Punkte
+fehlen! Achten Sie darauf, dass die Farbtöne der beiden Bälle klar
+unterscheidbar sind. Passen Sie ggf. die Helligkeit der Kamera und die
+Lichtverhältnisse an. Wiederholen Sie ggf. die Kalibration.
 
-Um nur im Zentralbereich auf die Objekte empfindlich zu sein, können die Parameter
-`fxROI` und `fyROI` angepasst werden. Die Option `motionDetection: true` ermöglicht
-es, nur auf Objekte empfindlich zu sein, die ihre Position zwischen zwei Videobildern
-verändert haben. Diese Einstellungen sind hilfreich, um statische Hintergrundobjekte
+Um nur im Zentralbereich auf die Objekte empfindlich zu sein, können
+die Parameter `fxROI` und `fyROI` angepasst werden. Die Option
+`motionDetection: true` ermöglicht es, nur auf Objekte empfindlich
+zu sein, die ihre Position zwischen zwei Videobildern verändert haben.
+Diese Einstellungen sind hilfreich, um statische Hintergrundobjekte
 oder Aktivitäten im Randbereich auszublenden. 
 
 Nun sollte die Kamera relativ zum Spielbrett so ausgerichtet werden, dass 
@@ -159,13 +159,18 @@ anzubringen.
 Nun ist der Aufbau bereit für die Erkennung von Kollisionen der beiden Bälle.
 Dazu sollten zwei Spielpartner versuchen, die Bälle koordiniert so anzustoßen,
 dass sie sich mit möglichst großer Geschwindigkeit in der Mitte treffen. Wenn
-eine Kollision erkannt wird, wird eine zur Energie im Schwerpunktsystem  proportionale
-Größe sowie der Stoßparameter berechnet; aus dem Produkt dieser beiden Größen
-ergibt sich die Punktzahl ("Score") für die eiden Spieler. Abhängig vom Score
-wird ein Bild einer echten Proton-Proton-Kollision im Videofenster überblendet.
-Die Verzeichnisse der Bilddateien, aus denen jeweils zufällig eine ausgewählt wird,
-sowie die zugehörigen Score-Werte, sind in der Konfigurationsdatei unter der 
-Überschrift `# directories with event pictures` eingetragen. Durch Ändern
+eine Kollision erkannt wird, wird eine zur Energie im Schwerpunktsystem
+proportionale Größe sowie der Stoßparameter berechnet; aus dem Produkt dieser
+beiden Größen ergibt sich die Punktzahl ("Score") für die eiden Spieler. Abhängig
+vom Score wird ein Bild einer echten Proton-Proton-Kollision im Videofenster
+überblendet. Für diese Demonstration werden Ereignisbilder aus der frühen
+Phase der Datennamhe im Jahr 2022 verwendet, die vom
+[CMS-Detektor] (https://cms.cern) am CERN
+aufgezeichnet wurden. 
+
+Die Verzeichnisse der Bilddateien, aus denen jeweils zufällig eine ausgewählt
+wird, sowie die zugehörigen Score-Werte, sind in der Konfigurationsdatei unter
+der Überschrift `# directories with event pictures` eingetragen. Durch Ändern
 dieser Einträge bzw. auch den Ersatz von Ereignisbildern sind weitgehende
 Anpassungen möglich. 
 

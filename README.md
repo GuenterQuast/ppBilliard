@@ -83,8 +83,8 @@ the equivalent centre-of-mass energy (in units of cm²/s²
 of unit mass), the impact parameter (0 to 1) and the
 momentum asymmetry in the centre-of-mass frame (-1 to 1).
 Depending on the "intensity" of the collision, an suitable 
-event picture from the [CMS Detector](https://cms.cern) at 
-CERN appears on the video screen.
+event picture of a proton-proton collision in the LCH
+appears on the video screen.
 
 Example
 --------
@@ -152,7 +152,9 @@ possible. If a collision is detected, a quantity proportional to the energy
 in the centre-of-gravity system and the impact parameter are calculated. 
 A score for the two players is calculated from the product of these two 
 values. Depending on the score an image of a real proton-proton collision 
-is superimposed in the video window.
+is superimposed in the video window. For this demonstration, on-line
+event picutes recorded during the eraly data-taking in 2022 by the
+[CMS Detector](https://cms.cern) at CERN are used as an example. 
 
 The directories of the image files, from which one is randomly selected 
 in each case, as well as the corresponding score values, are listed in 
