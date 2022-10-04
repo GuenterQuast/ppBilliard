@@ -138,10 +138,11 @@ unten beschrieben.
 
 Wenn Sie nun das Programm starten und die Bälle bewegen, sollte eine 
 Spur der Koordinaten im Videofenseter erscheinen. Achten Sie darauf,
-dass die Eingezeichneten Markierungen gleichmäßig sind, also keine Punkte
+dass die eingezeichneten Markierungen gleichmäßig sind, also keine Punkte
 fehlen! Achten Sie darauf, dass die Farbtöne der beiden Bälle klar
 unterscheidbar sind. Passen Sie ggf. die Helligkeit der Kamera und die
-Lichtverhältnisse an. Wiederholen Sie ggf. die Kalibration.
+Lichtverhältnisse an. Zur einfachen Beleuchtung ohne störende Schatten oder
+Reflexe hat sich ein LED-Panel von 30x15cm² Fläche als sehr geeignet erwiesen. 
 
 Um nur im Zentralbereich auf die Objekte empfindlich zu sein, können
 die Parameter `fxROI` und `fyROI` angepasst werden. Die Option
