@@ -132,7 +132,9 @@ When you start the programme and move the balls, a track of the coordinates
 should should appear on the video screen. Make sure that the marks are evenly
 spaced, i.e. that no points are missing! Make sure that the colour tones of the
 two balls are clearly distinguishable. If necessary, adjust the brightness of
-the camera and the lighting conditions. Repeat the calibration if necessary.
+the camera and the lighting conditions. For simple illumination without
+disturbing shadows or reflections, a 30x15cm² LED panel has proven to be
+very suitable. 
 
 To be sensitive to the objects only in the central area, the parameters
 `fxROI` and `fyROI` can be adjusted. The option `motionDetection: true` 
